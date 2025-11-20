@@ -239,7 +239,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.WindowSizeMsg:
 		// Handle window resizing
-		paneHeight := msg.Height - 1 // Adjust for status bar
+		paneHeight := msg.Height - 1 - 2 // Adjust for status bar and borders
 		paneWidth := msg.Width/2 - 2
 		m.leftPane.height = paneHeight
 		m.rightPane.height = paneHeight
