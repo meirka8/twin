@@ -15,7 +15,22 @@ func (m model) View() string {
 
 	if m.isPreviewing {
 		var finalView string
-		previewView := previewStyle.Width(m.previewWidth).Height(m.previewHeight).Render(m.previewContent)
+		// Calculate inner dimensions for content
+		// Border (2) + Padding (4) = 6 horizontal overhead
+		// Border (2) + Padding (2) = 4 vertical overhead
+		innerWidth := m.previewWidth - 6
+		innerHeight := m.previewHeight - 4
+
+		// Wrap content to fit width first
+		wrappedContent := lipgloss.NewStyle().Width(innerWidth).Render(m.previewContent)
+
+		// Truncate to fit height
+		contentLines := strings.Split(wrappedContent, "\n")
+		if len(contentLines) > innerHeight {
+			contentLines = contentLines[:innerHeight]
+		}
+
+		previewView := previewStyle.Width(m.previewWidth).Height(m.previewHeight).Render(strings.Join(contentLines, "\n"))
 		if m.leftPane.active {
 			finalView = lipgloss.JoinHorizontal(lipgloss.Top, previewView, paneView(m.rightPane))
 		} else {
