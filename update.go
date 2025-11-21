@@ -391,6 +391,20 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 			if p.cursor < len(p.files)-1 {
 				p.cursor++
 			}
+		case "pgup":
+			p.searchQuery = "" // Clear search on navigation
+			p.cursor -= p.height
+			if p.cursor < 0 {
+				p.cursor = 0
+			}
+		case "pgdown":
+			p.searchQuery = "" // Clear search on navigation
+			if len(p.files) > 0 {
+				p.cursor += p.height
+				if p.cursor >= len(p.files) {
+					p.cursor = len(p.files) - 1
+				}
+			}
 		case "enter":
 			p.searchQuery = "" // Clear search on navigation
 			if len(p.files) > 0 {
