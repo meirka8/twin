@@ -11,16 +11,19 @@ A minimalistic two-pane TUI file manager in Go with Norton-style commands and "s
 ## Features
 
 *   **Two-pane layout:** A classic two-pane file manager interface.
-*   **File navigation:** Navigate through the file system using the arrow keys, `home`, `end`, and `backspace`.
+*   **File navigation:** Navigate through the file system using the arrow keys, `home`, `end`, `pgup`, `pgdown`, and `backspace`.
+*   **Parent Navigation:** Navigate to the parent directory using `backspace`, `h`, or by selecting the `..` entry. The cursor position is preserved on the exited folder.
 *   **File selection:** Select multiple files using the `insert` key.
 *   **File operations:**
     *   **Copy (F5):** Copy selected files from the active pane to the inactive pane.
     *   **Move (F6):** Move selected files from the active pane to the inactive pane.
     *   **Delete (F8):** Delete the selected file or folder.
     *   **New Folder (F7):** Create a new folder in the active pane.
+    *   **Copy Path (Alt+P):** Copy the full path of selected files to the system clipboard.
 *   **Overwrite confirmation:** A confirmation prompt is displayed when a file operation would overwrite an existing file.
 *   **Active search:** Start typing to search for files in the active pane.
 *   **File preview (F3):** Preview the content of the selected file in a full-screen overlay.
+    *   **Scrollable:** Use `up`, `down`, `pgup`, `pgdown`, `home`, and `end` to scroll through the preview content.
 
 ## Technical Details
 
@@ -28,7 +31,7 @@ A minimalistic two-pane TUI file manager in Go with Norton-style commands and "s
 
 The application follows the Model-View-Update (MVU) architecture provided by the Bubble Tea framework.
 
-*   **Model (`model` struct):** The `model` struct holds the entire state of the application, including the state of the two panes, the current operation (e.g., creating a folder, deleting a file), and any error messages.
+*   **Model (`model` struct):** The `model` struct holds the entire state of the application, including the state of the two panes, the current operation (e.g., creating a folder, deleting a file), preview state, and any error messages.
 *   **View (`View` function):** The `View` function is responsible for rendering the UI based on the current state of the model. It uses the `lipgloss` library for styling.
 *   **Update (`Update` function):** The `Update` function handles all incoming messages (e.g., key presses, window resizing) and updates the model accordingly.
 
@@ -42,4 +45,8 @@ File operations are handled by sending commands (e.g., `copyFilesCmd`, `moveFile
 
 ### Preview
 
-The file preview feature is implemented by setting a `isPreviewing` flag in the model. When this flag is true, the `View` function renders the preview content in an overlay instead of the two panes. The file content is read by the `previewFileCmd` command.
+The file preview feature is implemented by setting a `isPreviewing` flag in the model. When this flag is true, the `View` function renders the preview content in an overlay instead of the two panes. The file content is read by the `previewFileCmd` command. The preview supports scrolling by tracking a `previewScrollY` offset in the model.
+
+### Layout Improvements
+
+Recent updates have addressed layout issues to ensure consistent pane heights and correct rendering within the terminal window, preventing rows from being cut off or panes from overflowing.

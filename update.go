@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"path/filepath"
 	"strings"
 
@@ -286,16 +285,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle messages that are always processed
 	switch msg := msg.(type) {
 	case directoryLoadedMsg:
-		log.Printf("Directory loaded for pane %d. FocusPath: '%s'", msg.paneID, msg.focusPath)
 		if msg.paneID == m.leftPane.id {
 			m.leftPane.files = msg.files
 			m.leftPane.err = msg.err
 			if msg.focusPath != "" {
-				log.Printf("Focusing path: %s", msg.focusPath)
 				for i, f := range m.leftPane.files {
-					log.Printf("Comparing with: %s", f.Path)
 					if f.Path == msg.focusPath {
-						log.Printf("Match found at index %d", i)
 						m.leftPane.cursor = i
 						// Adjust viewport to make cursor visible
 						if m.leftPane.cursor >= m.leftPane.viewportY+m.leftPane.height-2 {
@@ -437,12 +432,10 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 		case "backspace", "h":
 			p.searchQuery = "" // Clear search on navigation
 			parentPath := filepath.Dir(p.path)
-			log.Printf("Backspace/h pressed. Current: %s, Parent: %s", p.path, parentPath)
 			if parentPath != p.path { // Ensure we don't go above root
 				currentPath := p.path
 				p.path = parentPath
 				p.cursor = 0 // Reset cursor when going up (will be fixed by focusPath)
-				log.Printf("Navigating up. FocusPath: %s", currentPath)
 				return p, p.loadDirectoryCmd(currentPath)
 			}
 		case "enter":
@@ -455,7 +448,6 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 						currentPath := p.path
 						p.path = selectedFile.Path
 						p.cursor = 0
-						log.Printf("Entering '..'. FocusPath: %s", currentPath)
 						return p, p.loadDirectoryCmd(currentPath)
 					}
 
