@@ -125,6 +125,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isPreviewing = false
 				m.previewContent = ""
 				m.previewFilePath = ""
+				m.previewScrollY = 0
+				return m, nil
+			case "up", "k":
+				if m.previewScrollY > 0 {
+					m.previewScrollY--
+				}
+				return m, nil
+			case "down", "j":
+				m.previewScrollY++
+				return m, nil
+			case "pgup":
+				m.previewScrollY -= m.previewHeight
+				if m.previewScrollY < 0 {
+					m.previewScrollY = 0
+				}
+				return m, nil
+			case "pgdown":
+				m.previewScrollY += m.previewHeight
+				return m, nil
+			case "home", "g":
+				m.previewScrollY = 0
+				return m, nil
+			case "end", "G":
+				// We don't know the max height here easily without wrapping logic,
+				// so we set it to a very large number and let View clamp it.
+				m.previewScrollY = 1000000
 				return m, nil
 			}
 		}
@@ -154,6 +180,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.previewFilePath = selectedFile.Path
 						m.previewWidth = activePane.width
 						m.previewHeight = activePane.height
+						m.previewScrollY = 0
 						return m, previewFileCmd(selectedFile.Path)
 					}
 				}

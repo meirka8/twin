@@ -24,13 +24,29 @@ func (m model) View() string {
 		// Wrap content to fit width first
 		wrappedContent := lipgloss.NewStyle().Width(innerWidth).Render(m.previewContent)
 
-		// Truncate to fit height
+		// Truncate to fit height with scrolling
 		contentLines := strings.Split(wrappedContent, "\n")
-		if len(contentLines) > innerHeight {
-			contentLines = contentLines[:innerHeight]
+		maxScroll := len(contentLines) - innerHeight
+		if maxScroll < 0 {
+			maxScroll = 0
 		}
 
-		previewView := previewStyle.Width(m.previewWidth).Height(m.previewHeight).Render(strings.Join(contentLines, "\n"))
+		if m.previewScrollY > maxScroll {
+			m.previewScrollY = maxScroll
+		}
+		if m.previewScrollY < 0 {
+			m.previewScrollY = 0
+		}
+
+		start := m.previewScrollY
+		end := start + innerHeight
+		if end > len(contentLines) {
+			end = len(contentLines)
+		}
+
+		visibleLines := contentLines[start:end]
+
+		previewView := previewStyle.Width(m.previewWidth).Height(m.previewHeight).Render(strings.Join(visibleLines, "\n"))
 		if m.leftPane.active {
 			finalView = lipgloss.JoinHorizontal(lipgloss.Top, previewView, paneView(m.rightPane))
 		} else {

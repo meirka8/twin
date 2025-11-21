@@ -60,6 +60,7 @@ type model struct {
 	previewFilePath       string
 	previewWidth          int
 	previewHeight         int
+	previewScrollY        int
 }
 
 // initialModel creates a new model with default state.
