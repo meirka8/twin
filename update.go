@@ -125,6 +125,61 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isPreviewing = false
 				m.previewContent = ""
 				m.previewFilePath = ""
+				m.previewScrollY = 0
+				return m, nil
+			case "up", "k":
+				if m.previewScrollY > 0 {
+					m.previewScrollY--
+				}
+				return m, nil
+			case "down", "j":
+				// Calculate max scroll
+				innerWidth := m.previewWidth - 6
+				innerHeight := m.previewHeight - 4
+				wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
+				maxScroll := len(wrappedLines) - innerHeight
+				if maxScroll < 0 {
+					maxScroll = 0
+				}
+
+				if m.previewScrollY < maxScroll {
+					m.previewScrollY++
+				}
+				return m, nil
+			case "pgup":
+				m.previewScrollY -= m.previewHeight
+				if m.previewScrollY < 0 {
+					m.previewScrollY = 0
+				}
+				return m, nil
+			case "pgdown":
+				// Calculate max scroll
+				innerWidth := m.previewWidth - 6
+				innerHeight := m.previewHeight - 4
+				wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
+				maxScroll := len(wrappedLines) - innerHeight
+				if maxScroll < 0 {
+					maxScroll = 0
+				}
+
+				m.previewScrollY += m.previewHeight
+				if m.previewScrollY > maxScroll {
+					m.previewScrollY = maxScroll
+				}
+				return m, nil
+			case "home", "g":
+				m.previewScrollY = 0
+				return m, nil
+			case "end", "G":
+				// Calculate max scroll
+				innerWidth := m.previewWidth - 6
+				innerHeight := m.previewHeight - 4
+				wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
+				maxScroll := len(wrappedLines) - innerHeight
+				if maxScroll < 0 {
+					maxScroll = 0
+				}
+				m.previewScrollY = maxScroll
 				return m, nil
 			}
 		}
@@ -154,6 +209,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.previewFilePath = selectedFile.Path
 						m.previewWidth = activePane.width
 						m.previewHeight = activePane.height
+						m.previewScrollY = 0
 						return m, previewFileCmd(selectedFile.Path)
 					}
 				}
@@ -232,14 +288,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.paneID == m.leftPane.id {
 			m.leftPane.files = msg.files
 			m.leftPane.err = msg.err
+			if msg.focusPath != "" {
+				for i, f := range m.leftPane.files {
+					if f.Path == msg.focusPath {
+						m.leftPane.cursor = i
+						// Adjust viewport to make cursor visible
+						if m.leftPane.cursor >= m.leftPane.viewportY+m.leftPane.height-2 {
+							m.leftPane.viewportY = m.leftPane.cursor - m.leftPane.height + 3
+						}
+						break
+					}
+				}
+			}
 		} else if msg.paneID == m.rightPane.id {
 			m.rightPane.files = msg.files
 			m.rightPane.err = msg.err
+			if msg.focusPath != "" {
+				for i, f := range m.rightPane.files {
+					if f.Path == msg.focusPath {
+						m.rightPane.cursor = i
+						// Adjust viewport to make cursor visible
+						if m.rightPane.cursor >= m.rightPane.viewportY+m.rightPane.height-2 {
+							m.rightPane.viewportY = m.rightPane.cursor - m.rightPane.height + 3
+						}
+						break
+					}
+				}
+			}
 		}
 		return m, nil
 	case tea.WindowSizeMsg:
 		// Handle window resizing
-		paneHeight := msg.Height - 1 // Adjust for status bar
+		paneHeight := msg.Height - 1 - 2 // Adjust for status bar and borders
 		paneWidth := msg.Width/2 - 2
 		m.leftPane.height = paneHeight
 		m.rightPane.height = paneHeight
@@ -257,9 +337,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			// Reload directory in active pane
 			if m.leftPane.active {
-				return m, m.leftPane.loadDirectoryCmd()
+				return m, m.leftPane.loadDirectoryCmd("")
 			} else {
-				return m, m.rightPane.loadDirectoryCmd()
+				return m, m.rightPane.loadDirectoryCmd("")
 			}
 		}
 		return m, nil
@@ -278,9 +358,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Reload directory in active pane
 			if m.leftPane.active {
-				return m, m.leftPane.loadDirectoryCmd()
+				return m, m.leftPane.loadDirectoryCmd("")
 			} else {
-				return m, m.rightPane.loadDirectoryCmd()
+				return m, m.rightPane.loadDirectoryCmd("")
 			}
 		}
 		return m, nil
@@ -293,7 +373,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			// Reload both source and destination panes
-			cmds := []tea.Cmd{m.leftPane.loadDirectoryCmd(), m.rightPane.loadDirectoryCmd()}
+			cmds := []tea.Cmd{m.leftPane.loadDirectoryCmd(""), m.rightPane.loadDirectoryCmd("")}
 			return m, tea.Batch(cmds...)
 		}
 		return m, nil
@@ -325,35 +405,58 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 			p.cursor = 0
 		case "end":
 			p.cursor = len(p.files) - 1
-		case "up", "k":
+		case "up":
 			p.searchQuery = "" // Clear search on navigation
 			if p.cursor > 0 {
 				p.cursor--
 			}
-		case "down", "j":
+		case "down":
 			p.searchQuery = "" // Clear search on navigation
 			if p.cursor < len(p.files)-1 {
 				p.cursor++
+			}
+		case "pgup":
+			p.searchQuery = "" // Clear search on navigation
+			p.cursor -= p.height
+			if p.cursor < 0 {
+				p.cursor = 0
+			}
+		case "pgdown":
+			p.searchQuery = "" // Clear search on navigation
+			if len(p.files) > 0 {
+				p.cursor += p.height
+				if p.cursor >= len(p.files) {
+					p.cursor = len(p.files) - 1
+				}
+			}
+		case "backspace", "h":
+			p.searchQuery = "" // Clear search on navigation
+			parentPath := filepath.Dir(p.path)
+			if parentPath != p.path { // Ensure we don't go above root
+				currentPath := p.path
+				p.path = parentPath
+				p.cursor = 0 // Reset cursor when going up (will be fixed by focusPath)
+				return p, p.loadDirectoryCmd(currentPath)
 			}
 		case "enter":
 			p.searchQuery = "" // Clear search on navigation
 			if len(p.files) > 0 {
 				selectedFile := p.files[p.cursor]
 				if selectedFile.IsDir {
+					// Check if it's the parent directory entry ".."
+					if selectedFile.Name == ".." {
+						currentPath := p.path
+						p.path = selectedFile.Path
+						p.cursor = 0
+						return p, p.loadDirectoryCmd(currentPath)
+					}
+
 					p.path = selectedFile.Path
 					p.cursor = 0 // Reset cursor when entering a new directory
-					return p, p.loadDirectoryCmd()
+					return p, p.loadDirectoryCmd("")
 				} else {
 					return p, openFileCmd(selectedFile.Path)
 				}
-			}
-		case "backspace", "h": // Go up one directory
-			p.searchQuery = "" // Clear search on navigation
-			parentPath := filepath.Dir(p.path)
-			if parentPath != p.path { // Ensure we don't go above root
-				p.path = parentPath
-				p.cursor = 0 // Reset cursor when going up
-				return p, p.loadDirectoryCmd()
 			}
 		case "esc":
 			p.searchQuery = "" // Clear search explicitly

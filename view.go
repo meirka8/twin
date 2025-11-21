@@ -15,7 +15,38 @@ func (m model) View() string {
 
 	if m.isPreviewing {
 		var finalView string
-		previewView := previewStyle.Width(m.previewWidth).Height(m.previewHeight).Render(m.previewContent)
+		// Calculate inner dimensions for content
+		// Border (2) + Padding (4) = 6 horizontal overhead
+		// Border (2) + Padding (2) = 4 vertical overhead
+		innerWidth := m.previewWidth - 6
+		innerHeight := m.previewHeight - 4
+
+		// Wrap content to fit width first
+		wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
+
+		// Truncate to fit height with scrolling
+		contentLines := wrappedLines
+		maxScroll := len(contentLines) - innerHeight
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+
+		if m.previewScrollY > maxScroll {
+			m.previewScrollY = maxScroll
+		}
+		if m.previewScrollY < 0 {
+			m.previewScrollY = 0
+		}
+
+		start := m.previewScrollY
+		end := start + innerHeight
+		if end > len(contentLines) {
+			end = len(contentLines)
+		}
+
+		visibleLines := contentLines[start:end]
+
+		previewView := previewStyle.Width(m.previewWidth).Height(m.previewHeight).Render(strings.Join(visibleLines, "\n"))
 		if m.leftPane.active {
 			finalView = lipgloss.JoinHorizontal(lipgloss.Top, previewView, paneView(m.rightPane))
 		} else {
@@ -88,11 +119,11 @@ func paneView(p pane) string {
 	if p.cursor < p.viewportY {
 		p.viewportY = p.cursor
 	}
-	if p.cursor >= p.viewportY+p.height-1 {
-		p.viewportY = p.cursor - p.height + 2
+	if p.cursor >= p.viewportY+p.height-2 {
+		p.viewportY = p.cursor - p.height + 3
 	}
 
-	for i := p.viewportY; i < len(p.files) && i < p.viewportY+p.height-1; i++ {
+	for i := p.viewportY; i < len(p.files) && i < p.viewportY+p.height-2; i++ {
 		f := p.files[i]
 		line := " " + f.Name
 		if f.IsDir {

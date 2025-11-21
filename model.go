@@ -60,6 +60,7 @@ type model struct {
 	previewFilePath       string
 	previewWidth          int
 	previewHeight         int
+	previewScrollY        int
 }
 
 // initialModel creates a new model with default state.
@@ -87,5 +88,5 @@ func initialModel() model {
 
 // Init initializes the application.
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.leftPane.loadDirectoryCmd(), m.rightPane.loadDirectoryCmd())
+	return tea.Batch(m.leftPane.loadDirectoryCmd(""), m.rightPane.loadDirectoryCmd(""))
 }
