@@ -381,12 +381,12 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 			p.cursor = 0
 		case "end":
 			p.cursor = len(p.files) - 1
-		case "up", "k":
+		case "up":
 			p.searchQuery = "" // Clear search on navigation
 			if p.cursor > 0 {
 				p.cursor--
 			}
-		case "down", "j":
+		case "down":
 			p.searchQuery = "" // Clear search on navigation
 			if p.cursor < len(p.files)-1 {
 				p.cursor++
@@ -402,14 +402,6 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 				} else {
 					return p, openFileCmd(selectedFile.Path)
 				}
-			}
-		case "backspace", "h": // Go up one directory
-			p.searchQuery = "" // Clear search on navigation
-			parentPath := filepath.Dir(p.path)
-			if parentPath != p.path { // Ensure we don't go above root
-				p.path = parentPath
-				p.cursor = 0 // Reset cursor when going up
-				return p, p.loadDirectoryCmd()
 			}
 		case "esc":
 			p.searchQuery = "" // Clear search explicitly
