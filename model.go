@@ -61,6 +61,15 @@ type model struct {
 	previewWidth          int
 	previewHeight         int
 	previewScrollY        int
+	keyMap                KeyMap
+	modifierState         ModifierState
+}
+
+// ModifierState tracks the state of modifier keys.
+type ModifierState struct {
+	Ctrl  bool
+	Alt   bool
+	Shift bool
 }
 
 // initialModel creates a new model with default state.
@@ -83,6 +92,7 @@ func initialModel() model {
 			active:   false,
 			selected: make(map[string]struct{}),
 		},
+		keyMap: DefaultKeyMap(),
 	}
 }
 

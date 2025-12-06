@@ -35,6 +35,29 @@ func (m *model) processOverwriteConflicts() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
+	// Track modifiers (basic implementation)
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		logDebug("Key received: %s (Type: %v)", msg.String(), msg.Type)
+		// Reset modifiers on every key press for now, as we don't have reliable release events
+		// unless we are in a specific mode.
+		// We will set them based on the current key string if possible.
+		// Note: This is a best-effort approximation.
+		m.modifierState.Ctrl = false
+		m.modifierState.Alt = false
+		m.modifierState.Shift = false
+
+		if strings.Contains(msg.String(), "ctrl") {
+			m.modifierState.Ctrl = true
+		}
+		if strings.Contains(msg.String(), "alt") {
+			m.modifierState.Alt = true
+		}
+		if strings.Contains(msg.String(), "shift") || (len(msg.String()) == 1 && msg.String() == strings.ToUpper(msg.String()) && msg.String() != strings.ToLower(msg.String())) {
+			m.modifierState.Shift = true
+		}
+	}
+
 	// Handle operations that take precedence over normal key presses
 	if m.isCreatingFolder {
 		switch msg := msg.(type) {
@@ -187,17 +210,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
-			case "alt+q", "f10", "\x1b[21~": // alt+q, f10
+			case m.keyMap.Quit.Key: // Quit
 				m.quitting = true
 				return m, tea.Quit
-			case "ctrl+c": // Always allow ctrl+c to quit
+			case m.keyMap.ForceQuit.Key: // Force Quit
 				m.quitting = true
 				return m, tea.Quit
-			case "tab":
+			case m.keyMap.SwitchPane.Key:
 				m.leftPane.active = !m.leftPane.active
 				m.rightPane.active = !m.rightPane.active
 				return m, nil
-			case "alt+v", "f3", "\x1b[13~": // alt+v, f3
+			case m.keyMap.Preview.Key, "f3", "\x1b[13~": // Preview
 				activePane := &m.leftPane
 				if m.rightPane.active {
 					activePane = &m.rightPane
@@ -214,7 +237,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				return m, nil
-			case "alt+c", "f5", "\x1b[15~": // alt+c, f5
+			case m.keyMap.Copy.Key, "f5", "\x1b[15~": // Copy
 				sourcePane := &m.leftPane
 				destPane := &m.rightPane
 				if m.rightPane.active {
@@ -231,7 +254,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, copyFilesCmd(files, destPane.path, false)
 				}
 				return m, nil
-			case "alt+m", "f6", "\x1b[17~": // alt+m, f6
+			case m.keyMap.Move.Key, "f6", "\x1b[17~": // Move
 				sourcePane := &m.leftPane
 				destPane := &m.rightPane
 				if m.rightPane.active {
@@ -248,10 +271,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, moveFilesCmd(files, destPane.path, false)
 				}
 				return m, nil
-			case "alt+n", "f7", "\x1b[18~": // alt+n, f7
+			case m.keyMap.NewFolder.Key, "f7", "\x1b[18~": // New Folder
 				m.isCreatingFolder = true
 				return m, nil
-			case "alt+d", "f8", "\x1b[19~": // alt+d, f8
+			case m.keyMap.Delete.Key, "f8", "\x1b[19~": // Delete
 				activePane := &m.leftPane
 				if m.rightPane.active {
 					activePane = &m.rightPane
@@ -261,7 +284,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.fileToDelete = activePane.files[activePane.cursor]
 				}
 				return m, nil
-			case "alt+p":
+			case m.keyMap.CopyPath.Key:
 				activePane := &m.leftPane
 				if m.rightPane.active {
 					activePane = &m.rightPane
@@ -383,6 +406,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.Err
 		}
 		return m, nil
+	default:
+		logDebug("Unknown message: %T", msg)
 	}
 
 	// Delegate updates to active pane only if not in an operation mode
