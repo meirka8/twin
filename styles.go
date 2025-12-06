@@ -17,4 +17,11 @@ var (
 	confirmPromptStyle   = lipgloss.NewStyle().Background(lipgloss.Color("166")).Foreground(lipgloss.Color("255")).Padding(0, 1)
 	overwritePromptStyle = lipgloss.NewStyle().Background(lipgloss.Color("202")).Foreground(lipgloss.Color("0")).Padding(0, 1)
 	previewStyle         = lipgloss.NewStyle().Border(lipgloss.DoubleBorder(), true).BorderForeground(lipgloss.Color("205")).Padding(1, 2)
+
+	// Hint Styles
+	modifierStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	modifierActiveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")).Padding(0, 1)
+	hintKeyStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Bold(true)
+	hintDescStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	hintCardStyle       = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("240")).Padding(0, 1).MarginRight(1)
 )

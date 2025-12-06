@@ -61,6 +61,7 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView),
 		m.statusBarView(),
+		m.hintsView(),
 	)
 }
 
@@ -140,4 +141,55 @@ func paneView(p pane) string {
 	}
 
 	return style.Width(p.width).Height(p.height).Render(s.String())
+}
+
+func (m model) hintsView() string {
+	// Modifiers
+	ctrlStyle := modifierStyle
+	if m.modifierState.Ctrl {
+		ctrlStyle = modifierActiveStyle
+	}
+	altStyle := modifierStyle
+	if m.modifierState.Alt {
+		altStyle = modifierActiveStyle
+	}
+	shiftStyle := modifierStyle
+	if m.modifierState.Shift {
+		shiftStyle = modifierActiveStyle
+	}
+
+	modifiers := lipgloss.JoinHorizontal(lipgloss.Left,
+		ctrlStyle.Render("Ctrl"),
+		altStyle.Render("Alt"),
+		shiftStyle.Render("Shift"),
+	)
+
+	// Hints
+	var hints []string
+	targetModifier := "alt" // Default fallback
+	if m.modifierState.Ctrl {
+		targetModifier = "ctrl"
+	} else if m.modifierState.Alt {
+		targetModifier = "alt"
+	} else if m.modifierState.Shift {
+		targetModifier = "shift"
+	}
+
+	for _, shortcut := range m.keyMap.GetShortcuts() {
+		if shortcut.Modifier == targetModifier {
+			hint := hintCardStyle.Render(
+				lipgloss.JoinHorizontal(lipgloss.Left,
+					hintKeyStyle.Render(shortcut.Key),
+					hintDescStyle.Render(" | "+shortcut.Action),
+				),
+			)
+			hints = append(hints, hint)
+		}
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Left,
+		modifiers,
+		"  ", // Spacer
+		lipgloss.JoinHorizontal(lipgloss.Left, hints...),
+	)
 }
