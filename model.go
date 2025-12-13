@@ -63,6 +63,7 @@ type model struct {
 	previewScrollY        int
 	keyMap                KeyMap
 	modifierState         ModifierState
+	aliasMap              map[string]string
 }
 
 // ModifierState tracks the state of modifier keys.
@@ -79,6 +80,7 @@ func initialModel() model {
 		log.Fatal(err)
 	}
 
+	km := DefaultKeyMap()
 	return model{
 		leftPane: pane{
 			id:       0,
@@ -92,7 +94,8 @@ func initialModel() model {
 			active:   false,
 			selected: make(map[string]struct{}),
 		},
-		keyMap: DefaultKeyMap(),
+		keyMap:   km,
+		aliasMap: km.GetAliasMap(),
 	}
 }
 

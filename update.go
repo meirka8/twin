@@ -46,7 +46,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.isCreatingFolder {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			switch msg.String() {
+			key := msg.String()
+			if mapKey, ok := m.aliasMap[key]; ok {
+				key = mapKey
+			}
+			switch key {
 			case "enter":
 				activePane := &m.leftPane
 				if m.rightPane.active {
@@ -193,18 +197,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else { // Normal operation mode
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			switch msg.String() {
-			case m.keyMap.ForceQuit.Key, "ctrl+c": // Force Quit
+			key := msg.String()
+			if mapKey, ok := m.aliasMap[key]; ok {
+				key = mapKey
+			}
+			switch key {
+			case m.keyMap.Quit.Key: // Quit
 				m.quitting = true
 				return m, tea.Quit
-			case m.keyMap.Quit.Key, "alt+q": // Quit
+			case m.keyMap.ForceQuit.Key: // Force Quit
 				m.quitting = true
 				return m, tea.Quit
 			case m.keyMap.SwitchPane.Key:
 				m.leftPane.active = !m.leftPane.active
 				m.rightPane.active = !m.rightPane.active
 				return m, nil
-			case m.keyMap.Preview.Key, "f3", "\x1b[13~", "alt+v": // Preview
+			case m.keyMap.Preview.Key: // Preview
 				activePane := &m.leftPane
 				if m.rightPane.active {
 					activePane = &m.rightPane
@@ -221,7 +229,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				return m, nil
-			case m.keyMap.Copy.Key, "f5", "\x1b[15~", "alt+c": // Copy
+			case m.keyMap.Copy.Key: // Copy
 				sourcePane := &m.leftPane
 				destPane := &m.rightPane
 				if m.rightPane.active {
@@ -238,7 +246,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, copyFilesCmd(files, destPane.path, false)
 				}
 				return m, nil
-			case m.keyMap.Move.Key, "f6", "\x1b[17~", "alt+m": // Move
+			case m.keyMap.Move.Key: // Move
 				sourcePane := &m.leftPane
 				destPane := &m.rightPane
 				if m.rightPane.active {
@@ -255,10 +263,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, moveFilesCmd(files, destPane.path, false)
 				}
 				return m, nil
-			case m.keyMap.NewFolder.Key, "f7", "\x1b[18~", "alt+n": // New Folder
+			case m.keyMap.NewFolder.Key: // New Folder
 				m.isCreatingFolder = true
 				return m, nil
-			case m.keyMap.Delete.Key, "f8", "\x1b[19~", "alt+d": // Delete
+			case m.keyMap.Delete.Key: // Delete
 				activePane := &m.leftPane
 				if m.rightPane.active {
 					activePane = &m.rightPane
@@ -268,7 +276,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.fileToDelete = activePane.files[activePane.cursor]
 				}
 				return m, nil
-			case m.keyMap.CopyPath.Key, "alt+p":
+			case m.keyMap.CopyPath.Key:
 				activePane := &m.leftPane
 				if m.rightPane.active {
 					activePane = &m.rightPane

@@ -172,7 +172,7 @@ func (m model) hintsView() string {
 		if shortcut.Modifier == targetModifier {
 			hint := hintCardStyle.Render(
 				lipgloss.JoinHorizontal(lipgloss.Left,
-					hintKeyStyle.Render(shortcut.Key),
+					hintKeyStyle.Render(shortcut.DisplayKey),
 					hintDescStyle.Render(" | "+shortcut.Action),
 				),
 			)
