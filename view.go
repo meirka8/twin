@@ -53,17 +53,12 @@ func (m model) View() string {
 		} else {
 			finalView = lipgloss.JoinHorizontal(lipgloss.Top, paneView(m.leftPane), previewView)
 		}
-		return lipgloss.JoinVertical(lipgloss.Left, finalView, m.statusBarView())
+		return lipgloss.JoinVertical(lipgloss.Left, finalView, m.statusBarView(m.previewWidth))
 	}
 
 	// Component Rendering
 	leftView := paneView(m.leftPane)
 	rightView := paneView(m.rightPane)
-
-	leftBottom := lipgloss.JoinVertical(lipgloss.Left,
-		m.statusBarView(),
-		m.hintsView(),
-	)
 
 	progress := m.progressView()
 
@@ -71,8 +66,15 @@ func (m model) View() string {
 	if progress != "" {
 		// Calculate spacer width
 		totalWidth := m.leftPane.width + m.rightPane.width
-		leftWidth := lipgloss.Width(leftBottom)
 		progWidth := lipgloss.Width(progress)
+
+		// Render status bar with reduced width
+		leftBottom := lipgloss.JoinVertical(lipgloss.Left,
+			m.statusBarView(totalWidth-progWidth-1), // -1 for safety buffer
+			m.hintsView(),
+		)
+
+		leftWidth := lipgloss.Width(leftBottom)
 
 		spacerWidth := totalWidth - leftWidth - progWidth
 		if spacerWidth < 0 {
@@ -85,7 +87,10 @@ func (m model) View() string {
 			progress,
 		)
 	} else {
-		bottomView = leftBottom
+		bottomView = lipgloss.JoinVertical(lipgloss.Left,
+			m.statusBarView(m.leftPane.width+m.rightPane.width),
+			m.hintsView(),
+		)
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
@@ -94,7 +99,7 @@ func (m model) View() string {
 	)
 }
 
-func (m model) statusBarView() string {
+func (m model) statusBarView(maxWidth int) string {
 	if m.isCreatingFolder {
 		return inputPromptStyle.Render("Create folder: " + m.folderNameInput)
 	}
@@ -130,7 +135,9 @@ func (m model) statusBarView() string {
 	w := lipgloss.Width
 	statusWidth := w(status)
 	searchWidth := w(search)
-	availableWidth := m.leftPane.width + m.rightPane.width + 2 - searchWidth
+	availableWidth := maxWidth - searchWidth - 2 // -2 for spacers/padding?
+	// Use maxWidth directly. maxWidth is the total allowed width for the status line.
+
 	if availableWidth < statusWidth {
 		status = status[:availableWidth]
 	}
