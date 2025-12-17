@@ -56,14 +56,41 @@ func (m model) View() string {
 		return lipgloss.JoinVertical(lipgloss.Left, finalView, m.statusBarView())
 	}
 
+	// Component Rendering
 	leftView := paneView(m.leftPane)
 	rightView := paneView(m.rightPane)
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView),
+	leftBottom := lipgloss.JoinVertical(lipgloss.Left,
 		m.statusBarView(),
 		m.hintsView(),
-		m.progressView(),
+	)
+
+	progress := m.progressView()
+
+	var bottomView string
+	if progress != "" {
+		// Calculate spacer width
+		totalWidth := m.leftPane.width + m.rightPane.width
+		leftWidth := lipgloss.Width(leftBottom)
+		progWidth := lipgloss.Width(progress)
+
+		spacerWidth := totalWidth - leftWidth - progWidth
+		if spacerWidth < 0 {
+			spacerWidth = 0
+		}
+
+		bottomView = lipgloss.JoinHorizontal(lipgloss.Top,
+			leftBottom,
+			strings.Repeat(" ", spacerWidth),
+			progress,
+		)
+	} else {
+		bottomView = leftBottom
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView),
+		bottomView,
 	)
 }
 
@@ -194,8 +221,6 @@ func (m model) progressView() string {
 		return ""
 	}
 
-	width := m.leftPane.width + m.rightPane.width
-
 	// Calculate progress
 	var percent float64
 	if m.progressState.TotalBytes > 0 {
@@ -240,7 +265,7 @@ func (m model) progressView() string {
 		bar,
 	)
 
-	return progressContainerStyle.Width(width).Render(content)
+	return progressContainerStyle.Render(content)
 }
 
 func formatBytes(b int64) string {

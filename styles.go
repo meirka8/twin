@@ -49,8 +49,10 @@ var (
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("63")).
 				Padding(0, 1).
-				MarginTop(1).
-				Align(lipgloss.Right)
+				MarginTop(0). // Removed margin top to align with bottom row better?
+		// Actually if it's side-by-side with hints (which might have margin), we need to check.
+		// Hints usually occupy the bottom area.
+		MarginLeft(1)
 
 	progressBarStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("255")).
