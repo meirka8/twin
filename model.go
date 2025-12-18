@@ -67,17 +67,24 @@ type model struct {
 
 	progressState ProgressState
 	progressChan  chan progressMsg
+	nextOpID      int
 }
 
-// ProgressState tracks the progress of file operations.
-type ProgressState struct {
-	IsActive       bool
+// OpProgress tracks a single operation.
+type OpProgress struct {
 	TotalBytes     int64
 	WrittenBytes   int64
 	TotalFiles     int
 	ProcessedFiles int
 	CurrentFile    string
-	StartTime      time.Time
+	Done           bool
+	Err            error
+}
+
+// ProgressState tracks the progress of file operations.
+type ProgressState struct {
+	Operations map[int]OpProgress
+	StartTime  time.Time
 }
 
 // ModifierState tracks the state of modifier keys.

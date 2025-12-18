@@ -55,7 +55,7 @@ func waitForProgressMsg(sub chan progressMsg) tea.Cmd {
 	}
 }
 
-func copyFilesCmd(sourceFiles []file, destPath string, force bool, progressChan chan<- progressMsg) tea.Cmd {
+func copyFilesCmd(sourceFiles []file, destPath string, force bool, progressChan chan<- progressMsg, id int) tea.Cmd {
 	return func() tea.Msg {
 		if !force {
 			var conflicts []fileConflict
@@ -81,6 +81,7 @@ func copyFilesCmd(sourceFiles []file, destPath string, force bool, progressChan 
 			processedFiles := 0
 
 			progressChan <- progressMsg{
+				ID:           id,
 				TotalBytes:   totalBytes,
 				CurrentBytes: 0,
 				TotalFiles:   totalFiles,
@@ -91,11 +92,13 @@ func copyFilesCmd(sourceFiles []file, destPath string, force bool, progressChan 
 				destFilePath := filepath.Join(destPath, srcFile.Name)
 
 				progressChan <- progressMsg{
-					TotalBytes:   totalBytes,
-					CurrentBytes: currentBytes,
-					TotalFiles:   totalFiles,
-					CurrentFile:  srcFile.Name,
-					Done:         false,
+					ID:             id,
+					TotalBytes:     totalBytes,
+					CurrentBytes:   currentBytes,
+					TotalFiles:     totalFiles,
+					ProcessedFiles: processedFiles,
+					CurrentFile:    srcFile.Name,
+					Done:           false,
 				}
 
 				var err error
@@ -103,6 +106,7 @@ func copyFilesCmd(sourceFiles []file, destPath string, force bool, progressChan 
 					err = copyDir(srcFile.Path, destFilePath, func(n int64) {
 						currentBytes += n
 						progressChan <- progressMsg{
+							ID:             id,
 							TotalBytes:     totalBytes,
 							CurrentBytes:   currentBytes,
 							TotalFiles:     totalFiles,
@@ -115,6 +119,7 @@ func copyFilesCmd(sourceFiles []file, destPath string, force bool, progressChan 
 					err = copyFile(srcFile.Path, destFilePath, func(n int64) {
 						currentBytes += n
 						progressChan <- progressMsg{
+							ID:             id,
 							TotalBytes:     totalBytes,
 							CurrentBytes:   currentBytes,
 							TotalFiles:     totalFiles,
@@ -126,12 +131,12 @@ func copyFilesCmd(sourceFiles []file, destPath string, force bool, progressChan 
 				}
 
 				if err != nil {
-					progressChan <- progressMsg{Err: fmt.Errorf("failed to copy %s: %w", srcFile.Name, err), Done: true}
+					progressChan <- progressMsg{ID: id, Err: fmt.Errorf("failed to copy %s: %w", srcFile.Name, err), Done: true}
 					return
 				}
 				processedFiles++
 			}
-			progressChan <- progressMsg{Done: true}
+			progressChan <- progressMsg{ID: id, Done: true}
 		}()
 
 		// Return a nil message effectively, but we might want to signal start?
@@ -145,7 +150,7 @@ type copyStartedMsg struct {
 	err error
 }
 
-func moveFilesCmd(sourceFiles []file, destPath string, force bool, progressChan chan<- progressMsg) tea.Cmd {
+func moveFilesCmd(sourceFiles []file, destPath string, force bool, progressChan chan<- progressMsg, id int) tea.Cmd {
 	return func() tea.Msg {
 		if !force {
 			var conflicts []fileConflict
@@ -170,6 +175,7 @@ func moveFilesCmd(sourceFiles []file, destPath string, force bool, progressChan 
 		go func() {
 			for i, srcFile := range sourceFiles {
 				progressChan <- progressMsg{
+					ID:             id,
 					TotalFiles:     totalFiles,
 					ProcessedFiles: i,
 					CurrentFile:    srcFile.Name,
@@ -181,11 +187,11 @@ func moveFilesCmd(sourceFiles []file, destPath string, force bool, progressChan 
 				if err != nil {
 					// Todo: handle cross-device link error by falling back to copy+delete?
 					// For now, report error.
-					progressChan <- progressMsg{Err: fmt.Errorf("failed to move %s: %w", srcFile.Name, err), Done: true}
+					progressChan <- progressMsg{ID: id, Err: fmt.Errorf("failed to move %s: %w", srcFile.Name, err), Done: true}
 					return
 				}
 			}
-			progressChan <- progressMsg{Done: true}
+			progressChan <- progressMsg{ID: id, Done: true}
 		}()
 
 		return copyStartedMsg{} // Reusing copyStartedMsg or we can rename it to operationStartedMsg

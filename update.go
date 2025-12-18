@@ -26,10 +26,12 @@ func (m *model) processOverwriteConflicts() tea.Cmd {
 		filesToOperate = append(filesToOperate, conflict.Source)
 	}
 
+	opID := m.nextOpID
+	m.nextOpID++
 	if m.isMoving {
-		return moveFilesCmd(filesToOperate, filepath.Dir(m.overwriteConflicts[0].Destination), true, m.progressChan)
+		return moveFilesCmd(filesToOperate, filepath.Dir(m.overwriteConflicts[0].Destination), true, m.progressChan, opID)
 	}
-	return copyFilesCmd(filesToOperate, filepath.Dir(m.overwriteConflicts[0].Destination), true, m.progressChan)
+	return copyFilesCmd(filesToOperate, filepath.Dir(m.overwriteConflicts[0].Destination), true, m.progressChan, opID)
 }
 
 // Update handles messages and updates the model.
@@ -100,12 +102,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Overwrite the current file and process the rest
 				conflict := m.overwriteConflicts[0]
 				m.overwriteConflicts = m.overwriteConflicts[1:]
+				opID := m.nextOpID
+				m.nextOpID++
 				var operationCmd tea.Cmd
 				if m.isMoving {
-					operationCmd = moveFilesCmd([]file{conflict.Source}, filepath.Dir(conflict.Destination), true, m.progressChan)
+					operationCmd = moveFilesCmd([]file{conflict.Source}, filepath.Dir(conflict.Destination), true, m.progressChan, opID)
 				} else {
-					operationCmd = copyFilesCmd([]file{conflict.Source}, filepath.Dir(conflict.Destination), true, m.progressChan)
+					operationCmd = copyFilesCmd([]file{conflict.Source}, filepath.Dir(conflict.Destination), true, m.progressChan, opID)
 				}
+				// Initialize progress state for this op
+				if m.progressState.Operations == nil {
+					m.progressState.Operations = make(map[int]OpProgress)
+					m.progressState.StartTime = time.Now()
+				}
+				// Note: Ideally we want to set the state here, but copyStartedMsg handles it too or the first progressMsg will
+				// But we need to keep track of IsActive via the map existence.
+				// Let's rely on progressMsg to populate if missing, or set here.
+				// Since we don't have total size yet, we'll wait for progressMsg to create the entry or create a placeholder.
+
 				return m, tea.Sequence(operationCmd, m.processOverwriteConflicts())
 
 			case "n", "N":
@@ -244,7 +258,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(files) > 0 {
 					m.isMoving = false                              // It's a copy operation
 					sourcePane.selected = make(map[string]struct{}) // Clear selection
-					return m, copyFilesCmd(files, destPane.path, false, m.progressChan)
+					opID := m.nextOpID
+					m.nextOpID++
+					return m, copyFilesCmd(files, destPane.path, false, m.progressChan, opID)
 				}
 				return m, nil
 			case m.keyMap.Move.Key: // Move
@@ -261,7 +277,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(files) > 0 {
 					m.isMoving = true                               // It's a move operation
 					sourcePane.selected = make(map[string]struct{}) // Clear selection
-					return m, moveFilesCmd(files, destPane.path, false, m.progressChan)
+					opID := m.nextOpID
+					m.nextOpID++
+					return m, moveFilesCmd(files, destPane.path, false, m.progressChan, opID)
 				}
 				return m, nil
 			case m.keyMap.NewFolder.Key: // New Folder
@@ -402,29 +420,59 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case copyStartedMsg: // Operation started
 		if msg.err != nil {
 			m.err = msg.err
-			m.progressState.IsActive = false
 			return m, nil
 		}
-		m.progressState.IsActive = true
-		m.progressState.StartTime = time.Now()
+		if m.progressState.Operations == nil {
+			m.progressState.Operations = make(map[int]OpProgress)
+			m.progressState.StartTime = time.Now()
+		}
 		return m, waitForProgressMsg(m.progressChan)
 
 	case progressMsg:
+		if m.progressState.Operations == nil {
+			m.progressState.Operations = make(map[int]OpProgress)
+			m.progressState.StartTime = time.Now()
+		}
+
+		// Update or create op state
+		op := m.progressState.Operations[msg.ID]
+		if !msg.Done {
+			op.TotalBytes = msg.TotalBytes
+			op.WrittenBytes = msg.CurrentBytes
+			op.TotalFiles = msg.TotalFiles
+			op.ProcessedFiles = msg.ProcessedFiles
+			op.CurrentFile = msg.CurrentFile
+		}
+		op.Done = msg.Done
+		op.Err = msg.Err
+		m.progressState.Operations[msg.ID] = op
+
 		if msg.Done {
-			m.progressState.IsActive = false
 			if msg.Err != nil {
 				m.err = msg.Err
 			}
-			// Reload both source and destination panes
+			// Reload panes on completion of any op
+			// Optimize? Maybe only when all are done or periodically?
+			// User wants to see files appear, so reloading is good.
+			// But might interrupt navigation if it resets cursor. loadDirectoryCmd usually keeps cursor unless files change drastically.
+		}
+
+		// Check if ALL operations are done
+		allDone := true
+		for _, o := range m.progressState.Operations {
+			if !o.Done {
+				allDone = false
+				break
+			}
+		}
+
+		if allDone {
+			// Clear operations map to indicate idle
+			m.progressState.Operations = nil
+			// Final reload
 			cmds := []tea.Cmd{m.leftPane.loadDirectoryCmd(""), m.rightPane.loadDirectoryCmd("")}
 			return m, tea.Batch(cmds...)
 		}
-
-		m.progressState.TotalBytes = msg.TotalBytes
-		m.progressState.WrittenBytes = msg.CurrentBytes
-		m.progressState.TotalFiles = msg.TotalFiles
-		m.progressState.ProcessedFiles = msg.ProcessedFiles
-		m.progressState.CurrentFile = msg.CurrentFile
 
 		return m, waitForProgressMsg(m.progressChan)
 

@@ -38,6 +38,7 @@ type clipboardCopiedMsg struct {
 }
 
 type progressMsg struct {
+	ID             int
 	TotalBytes     int64
 	CurrentBytes   int64
 	TotalFiles     int

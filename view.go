@@ -224,17 +224,42 @@ func (m model) hintsView() string {
 }
 
 func (m model) progressView() string {
-	if !m.progressState.IsActive {
+	if len(m.progressState.Operations) == 0 {
+		return ""
+	}
+
+	var (
+		totalBytes     int64
+		writtenBytes   int64
+		totalFiles     int
+		processedFiles int
+		currentFile    string
+		activeOps      int
+	)
+
+	// Aggregate progress
+	for _, op := range m.progressState.Operations {
+		if !op.Done {
+			activeOps++
+			currentFile = op.CurrentFile // Picking one arbitrarily, or latest
+		}
+		totalBytes += op.TotalBytes
+		writtenBytes += op.WrittenBytes
+		totalFiles += op.TotalFiles
+		processedFiles += op.ProcessedFiles
+	}
+
+	if activeOps == 0 {
 		return ""
 	}
 
 	// Calculate progress
 	var percent float64
-	if m.progressState.TotalBytes > 0 {
-		percent = float64(m.progressState.WrittenBytes) / float64(m.progressState.TotalBytes)
-	} else if m.progressState.TotalFiles > 0 {
-		// Fallback to file count if bytes not available or 0
-		percent = float64(m.progressState.ProcessedFiles) / float64(m.progressState.TotalFiles)
+	if totalBytes > 0 {
+		percent = float64(writtenBytes) / float64(totalBytes)
+	} else if totalFiles > 0 {
+		// Fallback to file count
+		percent = float64(processedFiles) / float64(totalFiles)
 	}
 
 	if percent > 1.0 {
@@ -245,23 +270,30 @@ func (m model) progressView() string {
 	duration := time.Since(m.progressState.StartTime)
 	var speed string
 	if duration.Seconds() > 0 {
-		bytesPerSec := float64(m.progressState.WrittenBytes) / duration.Seconds()
+		bytesPerSec := float64(writtenBytes) / duration.Seconds()
 		speed = fmt.Sprintf("%s/s", formatBytes(int64(bytesPerSec)))
 	}
 
 	// Format status text
 	var statusText string
-	if m.progressState.TotalFiles > 1 {
-		statusText = fmt.Sprintf("Copying %d/%d files (%s) - %s", m.progressState.ProcessedFiles, m.progressState.TotalFiles, speed, m.progressState.CurrentFile)
+	if totalFiles > 1 {
+		statusText = fmt.Sprintf("Copying %d/%d files (%s) - %s", processedFiles, totalFiles, speed, currentFile)
 	} else {
-		statusText = fmt.Sprintf("Copying %s (%s)", m.progressState.CurrentFile, speed)
+		statusText = fmt.Sprintf("Copying %s (%s)", currentFile, speed)
 	}
 
 	// Create progress bar
 	barWidth := 20
+	// Ensure percent is not NaN
+	if percent != percent {
+		percent = 0
+	}
 	filledWidth := int(percent * float64(barWidth))
 	if filledWidth > barWidth {
 		filledWidth = barWidth
+	}
+	if filledWidth < 0 {
+		filledWidth = 0
 	}
 
 	bar := progressBarStyle.Render(strings.Repeat(" ", filledWidth)) +
