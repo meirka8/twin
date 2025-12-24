@@ -7,6 +7,17 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// ensureCursorInBounds validates and adjusts cursor position to be within file list bounds
+func ensureCursorInBounds(p *pane) {
+	if p.cursor >= len(p.files) {
+		if len(p.files) > 0 {
+			p.cursor = len(p.files) - 1
+		} else {
+			p.cursor = 0
+		}
+	}
+}
+
 // Update handles messages and updates the model.
 func (m *model) processOverwriteConflicts() tea.Cmd {
 	if m.skipAll {
@@ -325,13 +336,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			// Ensure cursor is within bounds after directory reload
-			if m.leftPane.cursor >= len(m.leftPane.files) {
-				if len(m.leftPane.files) > 0 {
-					m.leftPane.cursor = len(m.leftPane.files) - 1
-				} else {
-					m.leftPane.cursor = 0
-				}
-			}
+			ensureCursorInBounds(&m.leftPane)
 		} else if msg.paneID == m.rightPane.id {
 			m.rightPane.files = msg.files
 			m.rightPane.err = msg.err
@@ -348,13 +353,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			// Ensure cursor is within bounds after directory reload
-			if m.rightPane.cursor >= len(m.rightPane.files) {
-				if len(m.rightPane.files) > 0 {
-					m.rightPane.cursor = len(m.rightPane.files) - 1
-				} else {
-					m.rightPane.cursor = 0
-				}
-			}
+			ensureCursorInBounds(&m.rightPane)
 		}
 		return m, nil
 	case tea.WindowSizeMsg:
