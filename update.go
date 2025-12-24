@@ -324,6 +324,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+			// Ensure cursor is within bounds after directory reload
+			if m.leftPane.cursor >= len(m.leftPane.files) {
+				if len(m.leftPane.files) > 0 {
+					m.leftPane.cursor = len(m.leftPane.files) - 1
+				} else {
+					m.leftPane.cursor = 0
+				}
+			}
 		} else if msg.paneID == m.rightPane.id {
 			m.rightPane.files = msg.files
 			m.rightPane.err = msg.err
@@ -337,6 +345,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						break
 					}
+				}
+			}
+			// Ensure cursor is within bounds after directory reload
+			if m.rightPane.cursor >= len(m.rightPane.files) {
+				if len(m.rightPane.files) > 0 {
+					m.rightPane.cursor = len(m.rightPane.files) - 1
+				} else {
+					m.rightPane.cursor = 0
 				}
 			}
 		}
@@ -445,7 +461,11 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 		case "home":
 			p.cursor = 0
 		case "end":
-			p.cursor = len(p.files) - 1
+			if len(p.files) > 0 {
+				p.cursor = len(p.files) - 1
+			} else {
+				p.cursor = 0
+			}
 		case "up":
 			p.searchQuery = "" // Clear search on navigation
 			if p.cursor > 0 {
