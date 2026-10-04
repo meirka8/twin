@@ -37,14 +37,13 @@ func createFolderCmd(path string) tea.Cmd {
 	}
 }
 
-func deleteFileCmd(f file) tea.Cmd {
-	return deleteFilesCmd([]file{f})
-}
-
 func deleteFilesCmd(files []file) tea.Cmd {
 	return func() tea.Msg {
 		var errors []string
 		for _, f := range files {
+			if f.IsParent {
+				continue // Never delete the parent through its ".." entry
+			}
 			var err error
 			if f.IsDir {
 				err = os.RemoveAll(f.Path)
@@ -62,62 +61,17 @@ func deleteFilesCmd(files []file) tea.Cmd {
 	}
 }
 
-func copyFilesCmd(sourceFiles []file, destPath string, force bool) tea.Cmd {
+// planTransferCmd checks a copy/move batch against the destination without touching any
+// file; Update then resolves conflicts and runs transferFilesCmd for the whole batch.
+func planTransferCmd(sourceFiles []file, destPath string, move bool) tea.Cmd {
 	return func() tea.Msg {
-		if !force {
-			var conflicts []fileConflict
-			for _, srcFile := range sourceFiles {
-				destFilePath := filepath.Join(destPath, srcFile.Name)
-				if _, err := os.Stat(destFilePath); !os.IsNotExist(err) {
-					conflicts = append(conflicts, fileConflict{Source: srcFile, Destination: destFilePath})
-				}
-			}
-			if len(conflicts) > 0 {
-				return fileConflictMsg{Conflicts: conflicts}
-			}
-		}
-
-		for _, srcFile := range sourceFiles {
-			destFilePath := filepath.Join(destPath, srcFile.Name)
-			if srcFile.IsDir {
-				err := copyDir(srcFile.Path, destFilePath)
-				if err != nil {
-					return fileOperationMsg{err: fmt.Errorf("failed to copy directory %s: %w", srcFile.Name, err)}
-				}
-			} else {
-				err := copyFile(srcFile.Path, destFilePath)
-				if err != nil {
-					return fileOperationMsg{err: fmt.Errorf("failed to copy file %s: %w", srcFile.Name, err)}
-				}
-			}
-		}
-		return fileOperationMsg{err: nil}
+		return transferPlannedMsg{plan: planBatch(sourceFiles, destPath), destPath: destPath, move: move}
 	}
 }
 
-func moveFilesCmd(sourceFiles []file, destPath string, force bool) tea.Cmd {
+func transferFilesCmd(files []file, destPath string, move bool) tea.Cmd {
 	return func() tea.Msg {
-		if !force {
-			var conflicts []fileConflict
-			for _, srcFile := range sourceFiles {
-				destFilePath := filepath.Join(destPath, srcFile.Name)
-				if _, err := os.Stat(destFilePath); !os.IsNotExist(err) {
-					conflicts = append(conflicts, fileConflict{Source: srcFile, Destination: destFilePath})
-				}
-			}
-			if len(conflicts) > 0 {
-				return fileConflictMsg{Conflicts: conflicts}
-			}
-		}
-
-		for _, srcFile := range sourceFiles {
-			destFilePath := filepath.Join(destPath, srcFile.Name)
-			err := os.Rename(srcFile.Path, destFilePath)
-			if err != nil {
-				return fileOperationMsg{err: fmt.Errorf("failed to move %s: %w", srcFile.Name, err)}
-			}
-		}
-		return fileOperationMsg{err: nil}
+		return fileOperationMsg{err: transferFiles(files, destPath, move)}
 	}
 }
 

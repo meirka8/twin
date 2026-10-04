@@ -25,8 +25,10 @@ type fileOperationMsg struct { // For copy/move
 	err error
 }
 
-type fileConflictMsg struct {
-	Conflicts []fileConflict
+type transferPlannedMsg struct {
+	plan     batchPlan
+	destPath string
+	move     bool
 }
 
 type previewReadyMsg struct {

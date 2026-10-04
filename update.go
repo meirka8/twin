@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -18,28 +19,28 @@ func ensureCursorInBounds(p *pane) {
 	}
 }
 
-// Update handles messages and updates the model.
-func (m *model) processOverwriteConflicts() tea.Cmd {
-	if m.skipAll {
-		m.overwriteConflicts = nil // Skip all remaining
+// resolveConflicts runs the pending copy/move once every conflict has been decided:
+// the files that had no conflict together with the ones chosen for overwriting.
+func (m *model) resolveConflicts() tea.Cmd {
+	if len(m.overwriteConflicts) > 0 {
+		return nil // Still waiting for a decision
 	}
-
-	if len(m.overwriteConflicts) == 0 {
-		m.isConfirmingOverwrite = false
-		m.overwriteAll = false
-		m.skipAll = false
+	files := append(append([]file{}, m.pendingClean...), m.toOverwrite...)
+	dest, move := m.operationDest, m.isMoving
+	m.cancelTransfer()
+	if len(files) == 0 {
 		return nil
 	}
+	return transferFilesCmd(files, dest, move)
+}
 
-	var filesToOperate []file
-	for _, conflict := range m.overwriteConflicts {
-		filesToOperate = append(filesToOperate, conflict.Source)
-	}
-
-	if m.isMoving {
-		return moveFilesCmd(filesToOperate, filepath.Dir(m.overwriteConflicts[0].Destination), true)
-	}
-	return copyFilesCmd(filesToOperate, filepath.Dir(m.overwriteConflicts[0].Destination), true)
+// cancelTransfer drops the pending copy/move without touching any file.
+func (m *model) cancelTransfer() {
+	m.isConfirmingOverwrite = false
+	m.overwriteConflicts = nil
+	m.pendingClean = nil
+	m.toOverwrite = nil
+	m.operationDest = ""
 }
 
 // Update handles messages and updates the model.
@@ -111,36 +112,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
-			case "y", "Y":
-				// Overwrite the current file and process the rest
-				conflict := m.overwriteConflicts[0]
+			// Each key decides one conflict; the batch runs only once all are decided.
+			// cmd is assigned before returning because Go does not order the
+			// evaluation of m against the method call in `return m, m.f()`.
+			case "y", "Y": // Overwrite this file
+				m.toOverwrite = append(m.toOverwrite, m.overwriteConflicts[0].Source)
 				m.overwriteConflicts = m.overwriteConflicts[1:]
-				var operationCmd tea.Cmd
-				if m.isMoving {
-					operationCmd = moveFilesCmd([]file{conflict.Source}, filepath.Dir(conflict.Destination), true)
-				} else {
-					operationCmd = copyFilesCmd([]file{conflict.Source}, filepath.Dir(conflict.Destination), true)
+				cmd = m.resolveConflicts()
+				return m, cmd
+
+			case "n", "N": // Skip this file
+				m.overwriteConflicts = m.overwriteConflicts[1:]
+				cmd = m.resolveConflicts()
+				return m, cmd
+
+			case "a", "A": // Overwrite all remaining
+				for _, conflict := range m.overwriteConflicts {
+					m.toOverwrite = append(m.toOverwrite, conflict.Source)
 				}
-				return m, tea.Sequence(operationCmd, m.processOverwriteConflicts())
-
-			case "n", "N":
-				// Skip the current file and process the rest
-				m.overwriteConflicts = m.overwriteConflicts[1:]
-				return m, m.processOverwriteConflicts()
-
-			case "a", "A":
-				m.overwriteAll = true
-				return m, m.processOverwriteConflicts()
-
-			case "s", "S": // Skip All
-				m.skipAll = true
-				return m, m.processOverwriteConflicts()
-
-			case "esc":
-				m.isConfirmingOverwrite = false
 				m.overwriteConflicts = nil
-				m.overwriteAll = false
-				m.skipAll = false
+				cmd = m.resolveConflicts()
+				return m, cmd
+
+			case "s", "S": // Skip all remaining
+				m.overwriteConflicts = nil
+				cmd = m.resolveConflicts()
+				return m, cmd
+
+			case "esc": // Cancel the whole operation
+				m.cancelTransfer()
 				return m, nil
 			}
 		}
@@ -356,14 +356,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					sourcePane = &m.rightPane
 					destPane = &m.leftPane
 				}
-				files := getFilesFromSelected(*sourcePane)
-				if len(files) == 0 && len(sourcePane.files) > 0 { // Nothing selected, use focused file
-					files = []file{sourcePane.files[sourcePane.cursor]}
-				}
+				files := operationTargets(*sourcePane)
 				if len(files) > 0 {
-					m.isMoving = false                              // It's a copy operation
 					sourcePane.selected = make(map[string]struct{}) // Clear selection
-					return m, copyFilesCmd(files, destPane.path, false)
+					return m, planTransferCmd(files, destPane.path, false)
 				}
 				return m, nil
 			case m.keyMap.Move.Key: // Move
@@ -373,14 +369,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					sourcePane = &m.rightPane
 					destPane = &m.leftPane
 				}
-				files := getFilesFromSelected(*sourcePane)
-				if len(files) == 0 && len(sourcePane.files) > 0 { // Nothing selected, use focused file
-					files = []file{sourcePane.files[sourcePane.cursor]}
-				}
+				files := operationTargets(*sourcePane)
 				if len(files) > 0 {
-					m.isMoving = true                               // It's a move operation
 					sourcePane.selected = make(map[string]struct{}) // Clear selection
-					return m, moveFilesCmd(files, destPane.path, false)
+					return m, planTransferCmd(files, destPane.path, true)
 				}
 				return m, nil
 			case m.keyMap.NewFolder.Key: // New Folder
@@ -391,10 +383,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.rightPane.active {
 					activePane = &m.rightPane
 				}
-				files := getFilesFromSelected(*activePane)
-				if len(files) == 0 && len(activePane.files) > 0 { // Nothing selected, use focused file
-					files = []file{activePane.files[activePane.cursor]}
-				}
+				files := operationTargets(*activePane)
 				if len(files) > 0 {
 					m.isDeleting = true
 					m.filesToDelete = files
@@ -430,7 +419,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				pathToAdd := activePane.path
 				if len(activePane.files) > 0 {
 					f := activePane.files[activePane.cursor]
-					if f.IsDir && f.Name != ".." {
+					if f.IsDir && !f.IsParent {
 						pathToAdd = f.Path
 					}
 				}
@@ -581,10 +570,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-	case fileConflictMsg:
-		m.isConfirmingOverwrite = true
-		m.overwriteConflicts = msg.Conflicts
-		return m, nil
+	case transferPlannedMsg:
+		if len(msg.plan.rejected) > 0 {
+			m.err = errors.New(strings.Join(msg.plan.rejected, "; "))
+		}
+		m.isMoving = msg.move
+		m.operationDest = msg.destPath
+		m.pendingClean = msg.plan.clean
+		m.overwriteConflicts = msg.plan.conflicts
+		m.toOverwrite = nil
+		m.isConfirmingOverwrite = len(msg.plan.conflicts) > 0
+		cmd = m.resolveConflicts()
+		return m, cmd
 	case fileOperationMsg: // For copy/move operations
 		if msg.err != nil {
 			m.err = msg.err
@@ -670,7 +667,7 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 				selectedFile := p.files[p.cursor]
 				if selectedFile.IsDir {
 					// Check if it's the parent directory entry ".."
-					if selectedFile.Name == ".." {
+					if selectedFile.IsParent {
 						currentPath := p.path
 						p.path = selectedFile.Path
 						p.cursor = 0
@@ -689,11 +686,12 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 			p.searchQuery = "" // Clear search explicitly
 		case "insert":
 			if len(p.files) > 0 {
-				filePath := p.files[p.cursor].Path
-				if _, ok := p.selected[filePath]; ok {
-					delete(p.selected, filePath)
-				} else {
-					p.selected[filePath] = struct{}{}
+				if f := p.files[p.cursor]; !f.IsParent {
+					if _, ok := p.selected[f.Path]; ok {
+						delete(p.selected, f.Path)
+					} else {
+						p.selected[f.Path] = struct{}{}
+					}
 				}
 				// Move cursor down after selection/deselection
 				if p.cursor < len(p.files)-1 {
