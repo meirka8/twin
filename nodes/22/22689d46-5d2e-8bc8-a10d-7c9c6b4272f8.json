@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "22689d46-5d2e-8bc8-a10d-7c9c6b4272f8",
+    "conversation_id": "3b68aae2-4367-41db-bf0a-61ff90fa92ea",
+    "parent_id": null,
+    "timestamp": "2026-10-04T16:21:35Z",
+    "author": "human",
+    "user_prompt": "Hi! Please, examine @Twin — Roadmap.md",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011CfhWA91MWatwZbnF7bv9h"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 1,
+      "interaction_id": "22689d46-5d2e-8bc8-a10d-7c9c6b4272f8",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"cat \\\"/run/media/meirk/storage_2/projects/double_manager/twin2/Twin — Roadmap.md\\\"; ls; wc -l *.go\",\"description\":\"Read roadmap file and list Go sources\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "22689d46-5d2e-8bc8-a10d-7c9c6b4272f8",
+      "git_commit_hash": "a3d57a5034aacb0c60bdf7ee6c7b5cf80013379e",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}
