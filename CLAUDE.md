@@ -18,10 +18,13 @@ build/run the package (`.`), not an individual file.
 go run .              # run the app
 go build .            # build the ./twin binary
 go vet ./...          # static checks
-gofmt -l .            # check formatting (no test suite exists in this repo)
+gofmt -l .            # check formatting
+go test ./...         # run the tests
 ```
 
-There are no `_test.go` files currently, so there is no `go test` suite to run.
+`fs_test.go` covers the filesystem helpers with `t.TempDir()`. `update_test.go` drives
+`Update` with key messages and runs the returned commands (see its `send` helper), which is
+how to test anything that goes through the modal flow.
 
 ## Architecture
 
@@ -64,13 +67,16 @@ responsibility rather than by feature:
 ### Key conventions
 
 - File operations (copy/move) always operate from the *active* pane to the *inactive* pane's
-  current path. Selection defaults to the file under the cursor when nothing is explicitly
-  selected (see the repeated `getFilesFromSelected` + fallback-to-cursor pattern in `update.go`).
-  Selections are cleared on copy/move/delete.
-- Copy/move go through a two-phase conflict check: the command first probes for existing
-  destination files without `force`, returns `fileConflictMsg` if any exist, and `Update` then
-  drives an interactive y/n/A(ll)/s(kip all) loop (`processOverwriteConflicts`) that re-invokes
-  the same command with `force=true` per file.
+  current path. Targets come from `operationTargets`: the selection, or the file under the
+  cursor when nothing is selected. Selections are cleared on copy/move/delete.
+- The synthetic `..` entry has `IsParent` set and is never a target: it can't be selected,
+  deleted, copied or moved. Use `IsParent`, not `Name == ".."`.
+- Copy/move is plan → resolve → execute. `planTransferCmd` runs `planBatch`, which sorts the
+  batch into clean files, conflicts and rejected files (`..`, source == destination, a
+  directory into itself) without touching anything. `Update` then asks y/n/A(ll)/s(kip all)
+  per conflict (`resolveConflicts`) and only when every conflict is decided runs
+  `transferFilesCmd` once for the clean files plus the ones chosen for overwriting. Esc
+  cancels the whole batch. `transferFiles` re-checks the same safety rules.
 - Directory reloads pass an optional `focusPath` so the cursor can be restored to a specific
   entry after the reload (e.g. focus the newly created folder, or the parent's own path when
   navigating up via `..`).

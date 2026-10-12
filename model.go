@@ -17,6 +17,9 @@ type file struct {
 	Mode    fs.FileMode
 	ModTime time.Time
 	IsDir   bool
+	// IsParent marks the synthetic ".." entry. It is only for navigation and is
+	// never a target of selection or file operations.
+	IsParent bool
 }
 
 // fileConflict represents a file that already exists at the destination.
@@ -51,10 +54,11 @@ type model struct {
 	isDeleting            bool
 	filesToDelete         []file
 	isConfirmingOverwrite bool
-	overwriteConflicts    []fileConflict
-	overwriteAll          bool
-	skipAll               bool
-	isMoving              bool // To know if the operation is a move or copy
+	overwriteConflicts    []fileConflict // Conflicts still waiting for a decision
+	pendingClean          []file         // Files of the batch with no conflict, executed with the resolved ones
+	toOverwrite           []file         // Conflicting files the user chose to overwrite
+	operationDest         string         // Destination directory of the pending copy/move
+	isMoving              bool           // To know if the operation is a move or copy
 	isPreviewing          bool
 	previewContent        string
 	previewFilePath       string

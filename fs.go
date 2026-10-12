@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -14,11 +16,107 @@ import (
 func getFilesFromSelected(p pane) []file {
 	var files []file
 	for _, f := range p.files {
+		if f.IsParent {
+			continue
+		}
 		if _, ok := p.selected[f.Path]; ok {
 			files = append(files, f)
 		}
 	}
 	return files
+}
+
+// operationTargets returns the selected files of p, or the file under the cursor when
+// nothing is selected. The ".." entry is never a target.
+func operationTargets(p pane) []file {
+	files := getFilesFromSelected(p)
+	if len(files) == 0 && p.cursor < len(p.files) && !p.files[p.cursor].IsParent {
+		files = []file{p.files[p.cursor]}
+	}
+	return files
+}
+
+// batchPlan is the result of checking a copy/move batch against its destination.
+type batchPlan struct {
+	clean     []file         // Destination is free
+	conflicts []fileConflict // Destination already exists
+	rejected  []string       // Why individual files can never be transferred
+}
+
+// resolvePath resolves symlinks in the parent directories of path, so that two paths
+// reaching the same location through different links compare equal. The last element
+// is kept as is: a symlink being copied is the link itself, not its target.
+func resolvePath(path string) string {
+	dir, err := filepath.EvalSymlinks(filepath.Dir(path))
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	return filepath.Join(dir, filepath.Base(path))
+}
+
+// checkTransfer returns an error if src must never be copied or moved to dst.
+func checkTransfer(src file, dst string) error {
+	if src.IsParent {
+		return fmt.Errorf("%s: cannot operate on the parent entry", src.Name)
+	}
+	srcPath := resolvePath(src.Path)
+	dstPath := resolvePath(dst)
+	if srcPath == dstPath {
+		return fmt.Errorf("%s: source and destination are the same", src.Name)
+	}
+	if src.IsDir && strings.HasPrefix(dstPath, srcPath+string(filepath.Separator)) {
+		return fmt.Errorf("%s: cannot copy a directory into itself", src.Name)
+	}
+	return nil
+}
+
+// planBatch sorts a copy/move batch into files that can go straight to destDir, files
+// that would overwrite something, and files that must be refused. It touches nothing.
+func planBatch(sources []file, destDir string) batchPlan {
+	var plan batchPlan
+	for _, src := range sources {
+		dst := filepath.Join(destDir, src.Name)
+		if err := checkTransfer(src, dst); err != nil {
+			plan.rejected = append(plan.rejected, err.Error())
+			continue
+		}
+		_, err := os.Lstat(dst)
+		switch {
+		case err == nil:
+			plan.conflicts = append(plan.conflicts, fileConflict{Source: src, Destination: dst})
+		case os.IsNotExist(err):
+			plan.clean = append(plan.clean, src)
+		default:
+			plan.rejected = append(plan.rejected, fmt.Sprintf("%s: %v", src.Name, err))
+		}
+	}
+	return plan
+}
+
+// transferFiles copies or moves every file into destDir, overwriting existing entries.
+// It keeps going after a failure and returns all errors joined.
+func transferFiles(files []file, destDir string, move bool) error {
+	var errs []error
+	for _, src := range files {
+		dst := filepath.Join(destDir, src.Name)
+		if err := checkTransfer(src, dst); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		var err error
+		switch {
+		case move:
+			err = os.Rename(src.Path, dst)
+		case src.IsDir:
+			err = copyDir(src.Path, dst)
+		default:
+			err = copyFile(src.Path, dst)
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", src.Name, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // copyFile copies a single file from src to dst.
@@ -119,11 +217,12 @@ func readDirectory(dirPath string) ([]file, error) {
 	// Add ".." entry if not root
 	if filepath.Dir(dirPath) != dirPath {
 		parent := file{
-			Name:    "..",
-			Path:    filepath.Dir(dirPath),
-			IsDir:   true,
-			Mode:    os.ModeDir,
-			ModTime: time.Now(), // Dummy time
+			Name:     "..",
+			Path:     filepath.Dir(dirPath),
+			IsDir:    true,
+			IsParent: true,
+			Mode:     os.ModeDir,
+			ModTime:  time.Now(), // Dummy time
 		}
 		files = append([]file{parent}, files...)
 	}
