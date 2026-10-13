@@ -20,6 +20,9 @@ type file struct {
 	// IsParent marks the synthetic ".." entry. It is only for navigation and is
 	// never a target of selection or file operations.
 	IsParent bool
+	// IsSymlink marks a symbolic link. IsDir then describes the link's target, so a link
+	// to a directory is entered like one, but operations act on the link itself.
+	IsSymlink bool
 }
 
 // fileConflict represents a file that already exists at the destination.
@@ -40,7 +43,12 @@ type pane struct {
 	height      int // Height of the pane's display area
 	width       int // Width of the pane's display area
 	searchQuery string
-	err         error // Error encountered during directory loading
+}
+
+// logEntry is one line of the error log.
+type logEntry struct {
+	time time.Time
+	text string
 }
 
 // model is the main application model.
@@ -48,7 +56,11 @@ type model struct {
 	leftPane              pane
 	rightPane             pane
 	quitting              bool
-	err                   error
+	toast                 string     // Latest error, shown in the status bar until it expires
+	toastID               int        // Identifies the toast a toastExpiredMsg is meant for
+	errLog                []logEntry // Every error reported, oldest first
+	isLogOpen             bool
+	logScrollY            int // Lines scrolled up from the newest log entry
 	isCreatingFolder      bool
 	folderNameInput       string
 	isDeleting            bool
@@ -118,5 +130,5 @@ func initialModel() model {
 
 // Init initializes the application.
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.leftPane.loadDirectoryCmd(""), m.rightPane.loadDirectoryCmd(""))
+	return tea.Batch(m.leftPane.loadDirectoryCmd(m.leftPane.path, ""), m.rightPane.loadDirectoryCmd(m.rightPane.path, ""))
 }

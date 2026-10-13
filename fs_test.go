@@ -158,3 +158,88 @@ func TestTransferFilesKeepsGoingAfterError(t *testing.T) {
 		}
 	}
 }
+
+func TestReadDirectoryResolvesSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "d"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(dir, "d"), filepath.Join(dir, "to-dir")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(dir, "missing"), filepath.Join(dir, "broken")); err != nil {
+		t.Fatal(err)
+	}
+
+	if f := fileNamed(t, dir, "to-dir"); !f.IsDir || !f.IsSymlink {
+		t.Errorf("link to a directory: %+v", f)
+	}
+	if f := fileNamed(t, dir, "broken"); f.IsDir || !f.IsSymlink {
+		t.Errorf("broken link: %+v", f)
+	}
+}
+
+func TestReadDirectoryErrorKeepsParent(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	files, err := readDirectory(missing)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if len(files) != 1 || !files[0].IsParent {
+		t.Fatalf("expected only '..', got %+v", files)
+	}
+}
+
+func TestCopySymlinksAsLinks(t *testing.T) {
+	src, dst := t.TempDir(), t.TempDir()
+	if err := os.Mkdir(filepath.Join(src, "d"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("d", filepath.Join(src, "top")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(src, "tree"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../d", filepath.Join(src, "tree", "nested")); err != nil {
+		t.Fatal(err)
+	}
+
+	err := transferFiles([]file{fileNamed(t, src, "top"), fileNamed(t, src, "tree")}, dst, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{"top": "d", "tree/nested": "../d"} {
+		if got, err := os.Readlink(filepath.Join(dst, path)); err != nil || got != want {
+			t.Errorf("%s: got link to %q (%v), want %q", path, got, err, want)
+		}
+	}
+}
+
+func TestTransferRefusesOverwritingSourceUnderAnotherName(t *testing.T) {
+	a, b := t.TempDir(), t.TempDir()
+	writeFiles(t, b, "keep", "f", "g")
+	// a/f is a symlink to b/f: copying it into b would replace b/f with a link to itself.
+	if err := os.Symlink(filepath.Join(b, "f"), filepath.Join(a, "f")); err != nil {
+		t.Fatal(err)
+	}
+	// a/g is a hard link to b/g: copying it into b would truncate both.
+	if err := os.Link(filepath.Join(b, "g"), filepath.Join(a, "g")); err != nil {
+		t.Fatal(err)
+	}
+
+	sources := []file{fileNamed(t, a, "f"), fileNamed(t, a, "g")}
+	if plan := planBatch(sources, b); len(plan.rejected) != 2 {
+		t.Fatalf("expected both rejected, got %+v", plan)
+	}
+	for _, move := range []bool{false, true} {
+		if err := transferFiles(sources, b, move); err == nil {
+			t.Fatal("transferFiles accepted the batch")
+		}
+	}
+	for _, name := range []string{"f", "g"} {
+		if got := readFile(t, filepath.Join(b, name)); got != "keep" {
+			t.Errorf("%s: got %q", name, got)
+		}
+	}
+}

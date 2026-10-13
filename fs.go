@@ -64,10 +64,29 @@ func checkTransfer(src file, dst string) error {
 	if srcPath == dstPath {
 		return fmt.Errorf("%s: source and destination are the same", src.Name)
 	}
-	if src.IsDir && strings.HasPrefix(dstPath, srcPath+string(filepath.Separator)) {
+	if src.IsDir && !src.IsSymlink && strings.HasPrefix(dstPath, srcPath+string(filepath.Separator)) {
 		return fmt.Errorf("%s: cannot copy a directory into itself", src.Name)
 	}
+	if sameFile(src, dst) {
+		return fmt.Errorf("%s: destination is the same file as the source", src.Name)
+	}
 	return nil
+}
+
+// sameFile reports whether writing src to dst would overwrite src itself under another
+// name: a hard link, or a symlink on either side. A symlink source is copied as a link,
+// so for it only dst being the link's own target is a problem.
+func sameFile(src file, dst string) bool {
+	srcInfo, err := os.Stat(src.Path)
+	if err != nil {
+		return false
+	}
+	stat := os.Stat
+	if src.IsSymlink {
+		stat = os.Lstat
+	}
+	dstInfo, err := stat(dst)
+	return err == nil && os.SameFile(srcInfo, dstInfo)
 }
 
 // planBatch sorts a copy/move batch into files that can go straight to destDir, files
@@ -107,6 +126,8 @@ func transferFiles(files []file, destDir string, move bool) error {
 		switch {
 		case move:
 			err = os.Rename(src.Path, dst)
+		case src.IsSymlink:
+			err = copySymlink(src.Path, dst)
 		case src.IsDir:
 			err = copyDir(src.Path, dst)
 		default:
@@ -166,26 +187,40 @@ func copyDir(src, dst string) error {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
-		if entry.IsDir() {
+		switch {
+		case entry.Type()&os.ModeSymlink != 0:
+			err = copySymlink(srcPath, dstPath)
+		case entry.IsDir():
 			err = copyDir(srcPath, dstPath)
-			if err != nil {
-				return err
-			}
-		} else {
+		default:
 			err = copyFile(srcPath, dstPath)
-			if err != nil {
-				return err
-			}
+		}
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
+// copySymlink recreates the symlink src at dst with the same target, replacing an
+// existing file, link or empty directory at dst.
+func copySymlink(src, dst string) error {
+	target, err := os.Readlink(src)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return os.Symlink(target, dst)
+}
+
 // readDirectory reads the contents of a directory and returns a sorted list of file structs.
+// On error it still returns the ".." entry, so a pane is never stranded without a way up.
 func readDirectory(dirPath string) ([]file, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil, err
+		return withParentEntry(nil, dirPath), err
 	}
 
 	var files []file
@@ -196,13 +231,24 @@ func readDirectory(dirPath string) ([]file, error) {
 			continue
 		}
 
+		path := filepath.Join(dirPath, entry.Name())
+		isSymlink := info.Mode()&os.ModeSymlink != 0
+		isDir := entry.IsDir()
+		if isSymlink {
+			// A link to a directory is entered like one; a broken link stays a file.
+			if target, err := os.Stat(path); err == nil {
+				isDir = target.IsDir()
+			}
+		}
+
 		files = append(files, file{
-			Name:    entry.Name(),
-			Path:    filepath.Join(dirPath, entry.Name()),
-			Size:    info.Size(),
-			Mode:    info.Mode(),
-			ModTime: info.ModTime(),
-			IsDir:   entry.IsDir(),
+			Name:      entry.Name(),
+			Path:      path,
+			Size:      info.Size(),
+			Mode:      info.Mode(),
+			ModTime:   info.ModTime(),
+			IsDir:     isDir,
+			IsSymlink: isSymlink,
 		})
 	}
 
@@ -214,20 +260,24 @@ func readDirectory(dirPath string) ([]file, error) {
 		return files[i].Name < files[j].Name
 	})
 
-	// Add ".." entry if not root
-	if filepath.Dir(dirPath) != dirPath {
-		parent := file{
-			Name:     "..",
-			Path:     filepath.Dir(dirPath),
-			IsDir:    true,
-			IsParent: true,
-			Mode:     os.ModeDir,
-			ModTime:  time.Now(), // Dummy time
-		}
-		files = append([]file{parent}, files...)
-	}
+	return withParentEntry(files, dirPath), nil
+}
 
-	return files, nil
+// withParentEntry prepends the synthetic ".." entry to the listing of dirPath, unless
+// dirPath is the root.
+func withParentEntry(files []file, dirPath string) []file {
+	if filepath.Dir(dirPath) == dirPath {
+		return files
+	}
+	parent := file{
+		Name:     "..",
+		Path:     filepath.Dir(dirPath),
+		IsDir:    true,
+		IsParent: true,
+		Mode:     os.ModeDir,
+		ModTime:  time.Now(), // Dummy time
+	}
+	return append([]file{parent}, files...)
 }
 
 // getMountedDrives returns a list of mounted drive paths on Linux systems.

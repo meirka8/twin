@@ -8,6 +8,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func init() {
+	toastDuration = 0 // send runs every command synchronously, including the toast timer
+}
+
 // newTestModel builds a model with the left (active) pane on left and the right pane on
 // right, both already loaded.
 func newTestModel(t *testing.T, left, right string) model {
@@ -195,5 +199,132 @@ func TestEscCancelsWholeBatch(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dst, "a")); err == nil {
 		t.Fatal("a copied despite cancel")
+	}
+}
+
+func TestEnteringUnreadableDirectoryKeepsPaneWhereItWas(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read any directory")
+	}
+	dir := t.TempDir()
+	locked := filepath.Join(dir, "locked")
+	if err := os.Mkdir(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0755) })
+	m := newTestModel(t, dir, dir)
+	before := len(m.leftPane.files)
+
+	m = cursorTo(t, m, "locked")
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.leftPane.path != dir || len(m.leftPane.files) != before {
+		t.Fatalf("pane moved to %s with %d entries", m.leftPane.path, len(m.leftPane.files))
+	}
+	if m.leftPane.files[m.leftPane.cursor].Name != "locked" {
+		t.Fatal("cursor lost its place")
+	}
+	if len(m.errLog) != 1 {
+		t.Fatalf("expected the failure in the log, got %+v", m.errLog)
+	}
+}
+
+func TestFailedReloadStillOffersParent(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "gone")
+	if err := os.Mkdir(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFiles(t, dir, "x", "a", "b")
+	m := newTestModel(t, dir, dir)
+	m.leftPane.cursor = 2
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	m = send(t, m, m.leftPane.loadDirectoryCmd(dir, "")())
+	if len(m.leftPane.files) != 1 || !m.leftPane.files[0].IsParent || m.leftPane.cursor != 0 {
+		t.Fatalf("expected only '..' under the cursor, got %+v at %d", m.leftPane.files, m.leftPane.cursor)
+	}
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.leftPane.path != parent {
+		t.Fatalf("could not go up: pane at %s", m.leftPane.path)
+	}
+}
+
+func TestErrorsAreLoggedAndShownUntilExpired(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, "x", "a")
+	m := newTestModel(t, dir, dir)
+
+	m = cursorTo(t, m, "a")
+	m = send(t, m, alt('c')) // Same directory: rejected
+	if len(m.errLog) != 1 {
+		t.Fatalf("rejected copy not logged: %+v", m.errLog)
+	}
+	if m.toast != "" {
+		t.Fatalf("toast outlived its timer: %q", m.toast)
+	}
+
+	// An older timer must not clear a newer toast.
+	m.reportError(os.ErrPermission)
+	stale := toastExpiredMsg{id: m.toastID}
+	m.reportError(os.ErrNotExist)
+	next, _ := m.Update(stale)
+	if m = next.(model); m.toast == "" {
+		t.Fatal("newer toast cleared by an older timer")
+	}
+}
+
+func TestErrorLogOwnsKeysWhileOpen(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, "x", "a", "b")
+	m := newTestModel(t, dir, dir)
+
+	m = send(t, m, alt('l'))
+	if !m.isLogOpen {
+		t.Fatal("log did not open")
+	}
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyDown})
+	m = send(t, m, alt('d'))
+	m = send(t, m, key('b'))
+	if m.leftPane.cursor != 0 || m.isDeleting || m.leftPane.searchQuery != "" {
+		t.Fatal("keys leaked to the pane while the log was open")
+	}
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.isLogOpen {
+		t.Fatal("log did not close")
+	}
+}
+
+func TestSymlinkedDirectory(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	if err := os.Mkdir(target, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFiles(t, target, "keep", "inside")
+	if err := os.Symlink(target, filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	m := newTestModel(t, dir, dir)
+
+	m = cursorTo(t, m, "link")
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.leftPane.path != filepath.Join(dir, "link") {
+		t.Fatalf("Enter did not enter the link: pane at %s", m.leftPane.path)
+	}
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyEnter}) // ".." back out, focused on the link
+	if f := m.leftPane.files[m.leftPane.cursor]; f.Name != "link" {
+		t.Fatalf("cursor on %s after going up", f.Name)
+	}
+
+	m = send(t, m, alt('d'))
+	m = send(t, m, key('y'))
+	if _, err := os.Lstat(filepath.Join(dir, "link")); !os.IsNotExist(err) {
+		t.Fatal("link not deleted")
+	}
+	if got := readFile(t, filepath.Join(target, "inside")); got != "keep" {
+		t.Fatalf("deleting the link touched its target: %q", got)
 	}
 }

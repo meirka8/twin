@@ -26,6 +26,7 @@ type KeyMap struct {
 	AddToFavorites  Shortcut
 	SyncPanes       Shortcut
 	OpenInOther     Shortcut
+	ErrorLog        Shortcut
 }
 
 // DefaultKeyMap returns the default key mapping.
@@ -45,6 +46,7 @@ func DefaultKeyMap() KeyMap {
 		ToggleSelection: Shortcut{Key: "insert", DisplayKey: "ins", Modifier: "", Action: "Select", Cmd: "select"},
 		SyncPanes:       Shortcut{Key: "alt+i", DisplayKey: "i", Modifier: "alt", Action: "Sync Panes", Cmd: "sync_panes"},
 		OpenInOther:     Shortcut{Key: "alt+o", DisplayKey: "o", Modifier: "alt", Action: "Open in Other", Cmd: "open_in_other"},
+		ErrorLog:        Shortcut{Key: "alt+l", DisplayKey: "l", Modifier: "alt", Action: "Log", Cmd: "error_log"},
 	}
 }
 
@@ -65,6 +67,7 @@ func (k KeyMap) GetShortcuts() []Shortcut {
 		k.AddToFavorites,
 		k.SyncPanes,
 		k.OpenInOther,
+		k.ErrorLog,
 	}
 }
 
