@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "4b24ea3f-1224-8292-8997-d6256d531fbb",
+    "conversation_id": "30549621-2f94-4d6f-bf1f-5406593c5c9d",
+    "parent_id": "5eb772ee-d366-8c45-96f1-871c7da211d9",
+    "timestamp": "2026-10-12T19:19:21Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 22\n--- FAIL: TestTransferRefusesOverwritingSourceUnderAnotherName (0.00s)\n--- FAIL: TestEnteringUnreadableDirectoryKeepsPaneWhereItWas (0.00s)\nFAIL\nFAIL\ttwin\t0.007s\nFAIL\ncp: overwrite 'fs.go'? cp: overwrite 'update.go'? FAIL\n M commands.go\n M fs.go\n M fs_test.go\n M go.mod\n M keys.go\n M model.go\n M msg.go\n M styles.go\n M update.go\n M update_test.go\n M view.go",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": "Fish's `cp` alias prompted and didn't restore; restoring explicitly.",
+    "source_request_id": "req_011CfxtBi94cXKjXVs1Kv2Sk"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 54,
+      "interaction_id": "4b24ea3f-1224-8292-8997-d6256d531fbb",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"command cp -f /tmp/claude-1000/fs.bak fs.go && command cp -f /tmp/claude-1000/update.bak update.go && grep -c \\\"if sameFile(src, dst)\\\" fs.go && grep -A2 \\\"if msg.path != p.path\\\" update.go && go test ./... && rm /tmp/claude-1000/*.bak\",\"description\":\"Restore backed-up files and rerun tests\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "4b24ea3f-1224-8292-8997-d6256d531fbb",
+      "git_commit_hash": "2b5480db79827114bdc5d69324fcb34ce20c0ab6",
+      "link_type": "temporal",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

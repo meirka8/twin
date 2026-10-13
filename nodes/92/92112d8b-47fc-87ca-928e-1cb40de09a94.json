@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "92112d8b-47fc-87ca-928e-1cb40de09a94",
+    "conversation_id": "30549621-2f94-4d6f-bf1f-5406593c5c9d",
+    "parent_id": "db80d4f3-55b3-842a-85d6-757b46729b9a",
+    "timestamp": "2026-10-13T13:07:12Z",
+    "author": "human",
+    "user_prompt": "yes, commit and open the PR",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011CfzHcKebTcQBridtGBGPi"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 59,
+      "interaction_id": "92112d8b-47fc-87ca-928e-1cb40de09a94",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"git add -A && git status --short && git commit -q -F - <<'EOF'\\nShow errors, recover from unreadable directories, handle symlinks\\n\\n- Report every error through reportError: a status-bar toast that\\n  expires after 5s plus an error log (Alt+L). Errors used to be stored\\n  in m.err and never rendered, so a failed copy or delete looked like\\n  success. Panes now reload after a partially failed copy, move or\\n  delete.\\n- Navigate only once a listing succeeds: loadDirectoryCmd takes the\\n  target path and the pane moves there on success. Entering an\\n  unreadable directory used to strand the pane with no entries and no\\n  way up; now it stays put and the error is shown. A failed reload of\\n  the current directory still offers \\\"..\\\".\\n- Resolve symlinks in readDirectory: a link to a directory is entered\\n  like one (shown with an \\\"@\\\" suffix). Delete removes the link, never\\n  its target; copy recreates links as links, also inside copied trees.\\n- Refuse to copy or move a file onto itself under another name (a hard\\n  link, or a symlink on either side), which truncated the original.\\n- Mark the fixed rows in the roadmap and document the error and\\n  navigation conventions in CLAUDE.md.\\n\\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\\nEOF\\ngit push -u origin render-errors 2>&1 | tail -2\",\"description\":\"Commit changes and push branch\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "92112d8b-47fc-87ca-928e-1cb40de09a94",
+      "git_commit_hash": "2b5480db79827114bdc5d69324fcb34ce20c0ab6",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

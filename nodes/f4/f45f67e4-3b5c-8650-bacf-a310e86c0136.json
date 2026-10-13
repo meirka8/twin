@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "f45f67e4-3b5c-8650-bacf-a310e86c0136",
+    "conversation_id": "30549621-2f94-4d6f-bf1f-5406593c5c9d",
+    "parent_id": "4b24ea3f-1224-8292-8997-d6256d531fbb",
+    "timestamp": "2026-10-12T19:19:26Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 1\n\tif msg.path != p.path {\n\t\tif msg.err != nil {\n\t\t\treturn\nok  \ttwin\t(cached)",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": "Both mutations are caught by the new tests. Now a visual check of the toast and log overlay in a real terminal.",
+    "source_request_id": "req_011CfxtC5KHQAiU4fxqmCRiV"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 55,
+      "interaction_id": "f45f67e4-3b5c-8650-bacf-a310e86c0136",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"which tmux && go build -o /tmp/claude-1000/twin-test . && S=/tmp/claude-1000/demo && rm -rf $S && mkdir -p $S/locked $S/real && touch $S/a.txt && ln -s real $S/link && chmod 000 $S/locked && tmux kill-session -t tw 2>/dev/null; tmux new-session -d -s tw -x 120 -y 24 -c $S /tmp/claude-1000/twin-test && sleep 0.7 && tmux send-keys -t tw Down Enter && sleep 0.5 && tmux capture-pane -pt tw && tmux send-keys -t tw M-c && sleep 0.3 && tmux send-keys -t tw M-l && sleep 0.4 && tmux capture-pane -pt tw; tmux kill-session -t tw; chmod 755 $S/locked\",\"description\":\"Drive the app in tmux to capture toast and log\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "f45f67e4-3b5c-8650-bacf-a310e86c0136",
+      "git_commit_hash": "2b5480db79827114bdc5d69324fcb34ce20c0ab6",
+      "link_type": "temporal",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

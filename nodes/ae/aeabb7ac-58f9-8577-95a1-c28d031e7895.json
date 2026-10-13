@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "aeabb7ac-58f9-8577-95a1-c28d031e7895",
+    "conversation_id": "30549621-2f94-4d6f-bf1f-5406593c5c9d",
+    "parent_id": "ae1fcc38-2dd9-8e0e-aa98-5792d2df7d4d",
+    "timestamp": "2026-10-12T19:16:37Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] package main\n\nimport (\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n)\n\n// writeFiles creates each name in dir with the given content.\nfunc writeFiles(t *testing.T, dir string, content string, names ...string) {\n\tt.Helper()\n\tfor _, name := range names {\n\t\tif err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {\n\t\t\tt.Fatal(err)\n\t\t}\n\t}\n}\n\n// readFile returns the content of path, failing the test if it cannot be read.\nfunc readFile(t *testing.T, path string) string {\n\tt.Helper()\n\tb, err := os.ReadFile(path)\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn string(b)\n}\n\n// fileNamed returns the entry of dir called name.\nfunc fileNamed(t *testing.T, dir, name string) file {\n\tt.Helper()\n\tfiles, err := readDirectory(dir)\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tfor _, f := range files {\n\t\tif f.Name == name {\n\t\t\treturn f\n\t\t}\n\t}\n\tt.Fatalf(\"%s not found in %s\", name, dir)\n\treturn file{}\n}\n\nfunc TestReadDirectoryMarksParent(t *testing.T) {\n\tdir := t.TempDir()\n\twriteFiles(t, dir, \"x\", \"a\")\n\n\tfiles, err := readDirectory(dir)\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif len(files) != 2 || !files[0].IsParent || files[0].Name != \"..\" {\n\t\tt.Fatalf(\"expected '..' marked as parent first, got %+v\", files)\n\t}\n\tif files[1].IsParent {\n\t\tt.Fatalf(\"regular entry marked as parent: %+v\", files[1])\n\t}\n}\n\nMake copy, move and delete safe to use\n\n- Mark the synthetic \"..\" entry with IsParent and exclude it from\n  selection and from every operation; Alt+D on \"..\" used to run\n  os.RemoveAll on the parent directory.\n- Plan copy/move batches before touching anything: planBatch splits\n  them into clean files, conflicts and rejected files (source equal to\n  destination, a directory into itself). Copying with both panes on the\n  same directory used to truncate the source files to zero bytes.\n- Resolve overwrite conflicts one file at a time and run the whole batch\n  (clean + overwritten) once every conflict is decided. Previously\n  answering the first prompt overwrote all remaining conflicts, and\n  non-conflicting files in a batch with conflicts were silently dropped.\n- transferFiles re-checks the safety rules and reports every error\n  instead of stopping at the first one.\n- Add fs_test.go and update_test.go, the first tests in the repo.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011CfxstGM4eF8RMU86Yqo4m"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 47,
+      "interaction_id": "aeabb7ac-58f9-8577-95a1-c28d031e7895",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"cat utils.go go.mod\",\"description\":\"Read utils and go.mod\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "aeabb7ac-58f9-8577-95a1-c28d031e7895",
+      "git_commit_hash": "2b5480db79827114bdc5d69324fcb34ce20c0ab6",
+      "link_type": "temporal",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}
