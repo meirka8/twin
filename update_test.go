@@ -328,3 +328,26 @@ func TestSymlinkedDirectory(t *testing.T) {
 		t.Fatalf("deleting the link touched its target: %q", got)
 	}
 }
+
+func TestFavoritesOwnKeysWhileOpen(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, "x", "a", "b")
+	m := newTestModel(t, dir, dir)
+	m.favorites = []string{dir, filepath.Join(dir, "elsewhere")}
+
+	m = send(t, m, alt('f'))
+	if !m.isFavoritesOpen {
+		t.Fatal("favorites did not open")
+	}
+	m = send(t, m, tea.KeyMsg{Type: tea.KeyDown})
+	m = send(t, m, key('j'))
+	m = send(t, m, key('b'))
+	m = send(t, m, key('d')) // Asks to remove the favorite under the cursor
+	m = send(t, m, key('b')) // Unmatched key in the confirm
+	if !m.isConfirmingRemoveFav || m.favoritesCursor != 1 {
+		t.Fatalf("favorites did not handle its keys: cursor %d", m.favoritesCursor)
+	}
+	if m.leftPane.cursor != 0 || m.leftPane.searchQuery != "" {
+		t.Fatalf("keys leaked to the pane: cursor %d, search %q", m.leftPane.cursor, m.leftPane.searchQuery)
+	}
+}

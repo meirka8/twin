@@ -4,12 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // Helper to get file structs from selected paths
@@ -125,7 +129,7 @@ func transferFiles(files []file, destDir string, move bool) error {
 		var err error
 		switch {
 		case move:
-			err = os.Rename(src.Path, dst)
+			err = moveFile(src.Path, dst)
 		case src.IsSymlink:
 			err = copySymlink(src.Path, dst)
 		case src.IsDir:
@@ -140,41 +144,173 @@ func transferFiles(files []file, destDir string, move bool) error {
 	return errors.Join(errs...)
 }
 
-// copyFile copies a single file from src to dst.
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
+// rename is os.Rename, swapped out in tests to simulate a move across filesystems.
+var rename = os.Rename
 
-	destFile, err := os.Create(dst)
-	if err != nil {
+// moveFile moves src to dst. A directory moved onto an existing directory is merged into
+// it entry by entry. Across filesystems, where rename fails with EXDEV, src is copied,
+// the copy is flushed to disk, and only then is src removed.
+func moveFile(src, dst string) error {
+	err := rename(src, dst)
+	if err == nil {
+		return nil
+	}
+	srcInfo, statErr := os.Lstat(src)
+	if statErr != nil {
 		return err
 	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	if err != nil {
+	dstInfo, statErr := os.Lstat(dst)
+	dstExists := statErr == nil
+	// Rename refuses to replace a non-empty directory, and cannot cross filesystems.
+	mergeable := errors.Is(err, syscall.ENOTEMPTY) || errors.Is(err, syscall.EEXIST) || errors.Is(err, syscall.EXDEV)
+	if mergeable && srcInfo.IsDir() && dstExists && dstInfo.IsDir() {
+		return mergeDir(src, dst)
+	}
+	if !errors.Is(err, syscall.EXDEV) {
 		return err
 	}
-
-	sourceInfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-	return os.Chmod(dst, sourceInfo.Mode())
+	return moveAcrossDevices(src, dst, srcInfo, dstExists)
 }
 
-// copyDir recursively copies a directory from src to dst.
+// mergeDir moves every entry of the directory src into the existing directory dst,
+// then removes src. It stops at the first entry that fails.
+func mergeDir(src, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if err := moveFile(filepath.Join(src, entry.Name()), filepath.Join(dst, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return os.Remove(src)
+}
+
+// moveAcrossDevices copies src to dst on another filesystem and removes src once the
+// copy is on disk. If the copy fails, src is untouched and a dst that did not exist
+// before is removed again, so no partial copy is left behind.
+func moveAcrossDevices(src, dst string, srcInfo os.FileInfo, dstExists bool) error {
+	var err error
+	switch {
+	case srcInfo.Mode()&os.ModeSymlink != 0:
+		err = copySymlink(src, dst)
+	case srcInfo.IsDir():
+		err = copyDir(src, dst)
+	default:
+		err = copyFile(src, dst)
+	}
+	if err == nil {
+		err = syncFS(filepath.Dir(dst))
+	}
+	if err != nil {
+		if !dstExists {
+			if rmErr := removeTree(dst); rmErr != nil {
+				err = errors.Join(err, fmt.Errorf("removing the partial copy %s: %w", dst, rmErr))
+			}
+		}
+		return err
+	}
+	if err := removeTree(src); err != nil {
+		return fmt.Errorf("copied to %s, but removing the source failed: %w", dst, err)
+	}
+	return nil
+}
+
+// removeTree removes path like os.RemoveAll. If that fails, it makes every directory
+// under path owner-writable, since read-only directories (which copyDir recreates)
+// cannot be emptied, and tries again.
+func removeTree(path string) error {
+	if err := os.RemoveAll(path); err == nil {
+		return nil
+	}
+	// WalkDir visits a directory before reading it, so it is readable by then.
+	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && d.IsDir() {
+			if info, err := d.Info(); err == nil {
+				os.Chmod(p, info.Mode()|0700)
+			}
+		}
+		return nil // Best effort: RemoveAll below reports what is still in the way
+	})
+	return os.RemoveAll(path)
+}
+
+// syncFS flushes the filesystem holding dir to disk.
+func syncFS(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return unix.Syncfs(int(f.Fd()))
+}
+
+// copyFile copies the regular file src to dst, keeping its mode and modification time.
+// It writes a temporary file next to dst and renames it into place, so an existing dst
+// is either replaced whole or left as it was, never half-written. Replacing means an
+// existing dst is a new file: it is owned by the user, loses its ACLs and xattrs, a
+// symlink there is replaced rather than written through, other hard links to it keep
+// the old content, and the destination directory must be writable.
+func copyFile(src, dst string) (err error) {
+	info, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() { // Opening a FIFO would block, a device would never end
+		return fmt.Errorf("%s: not a regular file", src)
+	}
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	// Not named after dst: a long name plus a suffix could exceed NAME_MAX.
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".twin-copy-*")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tmp.Close()
+			if rmErr := os.Remove(tmp.Name()); rmErr != nil {
+				err = errors.Join(err, rmErr)
+			}
+		}
+	}()
+
+	if _, err = io.Copy(tmp, in); err != nil {
+		return err
+	}
+	if err = tmp.Chmod(info.Mode()); err != nil {
+		return err
+	}
+	if err = tmp.Close(); err != nil { // Delayed write errors surface here
+		return err
+	}
+	if err = os.Chtimes(tmp.Name(), time.Time{}, info.ModTime()); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), dst)
+}
+
+// copyDir recursively copies a directory from src to dst, merging into dst if it exists.
+// A directory it creates gets the mode and modification time of src.
 func copyDir(src, dst string) error {
 	sourceInfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
+	dstInfo, err := os.Lstat(dst)
+	created := os.IsNotExist(err)
+	if err == nil && dstInfo.Mode()&os.ModeSymlink != 0 {
+		// MkdirAll would follow it and merge into whatever the link points at.
+		return fmt.Errorf("%s: destination is a symlink, not a directory", dst)
+	}
 
-	err = os.MkdirAll(dst, sourceInfo.Mode())
-	if err != nil {
+	// Owner-writable while it is filled, so a read-only source can still be copied.
+	if err := os.MkdirAll(dst, 0700); err != nil {
 		return err
 	}
 
@@ -199,7 +335,14 @@ func copyDir(src, dst string) error {
 			return err
 		}
 	}
-	return nil
+	if !created {
+		return nil // Merged into an existing directory: leave its own attributes alone
+	}
+	if err := os.Chmod(dst, sourceInfo.Mode()); err != nil {
+		return err
+	}
+	// Last, since adding the entries above updated the modification time.
+	return os.Chtimes(dst, time.Time{}, sourceInfo.ModTime())
 }
 
 // copySymlink recreates the symlink src at dst with the same target, replacing an
