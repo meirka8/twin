@@ -2,8 +2,10 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -17,6 +19,45 @@ func ensureCursorInBounds(p *pane) {
 			p.cursor = 0
 		}
 	}
+}
+
+// toastDuration is how long an error stays in the status bar; the log keeps it for good.
+var toastDuration = 5 * time.Second
+
+// maxLogEntries caps the error log, dropping the oldest entries.
+const maxLogEntries = 500
+
+// reportError adds err to the error log and shows it in the status bar until the returned
+// command expires it. Joined errors (one per failed file) become one log entry each.
+func (m *model) reportError(err error) tea.Cmd {
+	if err == nil {
+		return nil
+	}
+	lines := strings.Split(err.Error(), "\n")
+	now := time.Now()
+	for _, line := range lines {
+		m.errLog = append(m.errLog, logEntry{time: now, text: line})
+	}
+	if len(m.errLog) > maxLogEntries {
+		m.errLog = m.errLog[len(m.errLog)-maxLogEntries:]
+	}
+	m.toast = lines[0]
+	if len(lines) > 1 {
+		m.toast += fmt.Sprintf(" (+%d more, %s for the log)", len(lines)-1, m.keyMap.ErrorLog.Key)
+	}
+	m.toastID++
+	id := m.toastID
+	return tea.Tick(toastDuration, func(time.Time) tea.Msg { return toastExpiredMsg{id: id} })
+}
+
+// logRows is how many log lines fit in the log overlay.
+func (m model) logRows() int {
+	return max(m.leftPane.height-2, 1) // Title and hint lines; both panes share a height
+}
+
+// maxLogScroll is the furthest the log can scroll up from its newest line.
+func (m model) maxLogScroll() int {
+	return max(len(m.logLines())-m.logRows(), 0)
 }
 
 // resolveConflicts runs the pending copy/move once every conflict has been decided:
@@ -221,15 +262,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						m.isFavoritesOpen = false
 						if m.leftPane.active {
-							m.leftPane.path = selectedPath
-							m.leftPane.cursor = 0
-							m.leftPane.viewportY = 0
-							return m, m.leftPane.loadDirectoryCmd("")
+							return m, m.leftPane.loadDirectoryCmd(selectedPath, "")
 						} else {
-							m.rightPane.path = selectedPath
-							m.rightPane.cursor = 0
-							m.rightPane.viewportY = 0
-							return m, m.rightPane.loadDirectoryCmd("")
+							return m, m.rightPane.loadDirectoryCmd(selectedPath, "")
 						}
 					}
 				case "delete", "d":
@@ -247,6 +282,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+		}
+	} else if m.isLogOpen {
+		if msg, ok := msg.(tea.KeyMsg); ok {
+			switch msg.String() {
+			case "esc", "q", m.keyMap.ErrorLog.Key:
+				m.isLogOpen = false
+			case "up", "k":
+				m.logScrollY = min(m.logScrollY+1, m.maxLogScroll())
+			case "down", "j":
+				m.logScrollY = max(m.logScrollY-1, 0)
+			case "pgup":
+				m.logScrollY = min(m.logScrollY+m.logRows(), m.maxLogScroll())
+			case "pgdown":
+				m.logScrollY = max(m.logScrollY-m.logRows(), 0)
+			case "home", "g":
+				m.logScrollY = m.maxLogScroll()
+			case "end", "G":
+				m.logScrollY = 0
+			}
+			return m, nil // The log owns the keyboard while open
 		}
 	} else if m.isPreviewing {
 		switch msg := msg.(type) {
@@ -406,6 +461,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, copyToClipboardCmd(strings.Join(paths, "\n"))
 				}
 				return m, nil
+			case m.keyMap.ErrorLog.Key:
+				m.isLogOpen = true
+				m.logScrollY = 0
+				return m, nil
 			case m.keyMap.Favorites.Key:
 				m.isFavoritesOpen = true
 				m.favoritesCursor = 0
@@ -442,11 +501,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					activePane = &m.rightPane
 					inactivePane = &m.leftPane
 				}
-				inactivePane.path = activePane.path
-				// Reset cursor and viewport for the inactive pane
-				inactivePane.cursor = 0
-				inactivePane.viewportY = 0
-				return m, inactivePane.loadDirectoryCmd("")
+				return m, inactivePane.loadDirectoryCmd(activePane.path, "")
 			case m.keyMap.OpenInOther.Key:
 				activePane := &m.leftPane
 				inactivePane := &m.rightPane
@@ -457,11 +512,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(activePane.files) > 0 {
 					selectedFile := activePane.files[activePane.cursor]
 					if selectedFile.IsDir {
-						inactivePane.path = selectedFile.Path
-						// Reset cursor and viewport for the inactive pane
-						inactivePane.cursor = 0
-						inactivePane.viewportY = 0
-						return m, inactivePane.loadDirectoryCmd("")
+						return m, inactivePane.loadDirectoryCmd(selectedFile.Path, "")
 					}
 				}
 				return m, nil
@@ -473,39 +524,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case directoryLoadedMsg:
 		if msg.paneID == m.leftPane.id {
-			m.leftPane.files = msg.files
-			m.leftPane.err = msg.err
-			if msg.focusPath != "" {
-				for i, f := range m.leftPane.files {
-					if f.Path == msg.focusPath {
-						m.leftPane.cursor = i
-						// Adjust viewport to make cursor visible
-						if m.leftPane.cursor >= m.leftPane.viewportY+m.leftPane.height-2 {
-							m.leftPane.viewportY = m.leftPane.cursor - m.leftPane.height + 3
-						}
-						break
-					}
-				}
-			}
-			// Ensure cursor is within bounds after directory reload
-			ensureCursorInBounds(&m.leftPane)
+			m.leftPane.applyListing(msg)
 		} else if msg.paneID == m.rightPane.id {
-			m.rightPane.files = msg.files
-			m.rightPane.err = msg.err
-			if msg.focusPath != "" {
-				for i, f := range m.rightPane.files {
-					if f.Path == msg.focusPath {
-						m.rightPane.cursor = i
-						// Adjust viewport to make cursor visible
-						if m.rightPane.cursor >= m.rightPane.viewportY+m.rightPane.height-2 {
-							m.rightPane.viewportY = m.rightPane.cursor - m.rightPane.height + 3
-						}
-						break
-					}
-				}
-			}
-			// Ensure cursor is within bounds after directory reload
-			ensureCursorInBounds(&m.rightPane)
+			m.rightPane.applyListing(msg)
+		}
+		cmd = m.reportError(msg.err)
+		return m, cmd
+	case toastExpiredMsg:
+		if msg.id == m.toastID { // A newer error restarted the timer
+			m.toast = ""
 		}
 		return m, nil
 	case tea.WindowSizeMsg:
@@ -533,46 +560,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rightPane.width = paneWidth
 		return m, nil
 	case fileOpenedMsg:
-		if msg.err != nil {
-			m.err = msg.err
-		}
-		return m, nil
+		cmd = m.reportError(msg.err)
+		return m, cmd
+	case clipboardCopiedMsg:
+		cmd = m.reportError(msg.err)
+		return m, cmd
 	case folderCreatedMsg:
 		if msg.err != nil {
-			m.err = msg.err
+			cmd = m.reportError(msg.err)
+			return m, cmd
 		} else {
 			// Reload directory in active pane and focus on the newly created folder
 			if m.leftPane.active {
-				return m, m.leftPane.loadDirectoryCmd(msg.folderPath)
+				return m, m.leftPane.loadDirectoryCmd(m.leftPane.path, msg.folderPath)
 			} else {
-				return m, m.rightPane.loadDirectoryCmd(msg.folderPath)
+				return m, m.rightPane.loadDirectoryCmd(m.rightPane.path, msg.folderPath)
 			}
 		}
-		return m, nil
 	case fileDeletedMsg:
-		if msg.err != nil {
-			m.err = msg.err
-		} else {
-			// Adjust cursor if it's out of bounds after deletion
-			activePane := &m.leftPane
-			if m.rightPane.active {
-				activePane = &m.rightPane
-			}
-			if activePane.cursor >= len(activePane.files)-1 && activePane.cursor > 0 {
-				activePane.cursor--
-			}
-
-			// Reload directory in active pane
-			if m.leftPane.active {
-				return m, m.leftPane.loadDirectoryCmd("")
-			} else {
-				return m, m.rightPane.loadDirectoryCmd("")
-			}
+		// Reload even after a failure: some of the files may be gone.
+		cmd = m.reportError(msg.err)
+		activePane := &m.leftPane
+		if m.rightPane.active {
+			activePane = &m.rightPane
 		}
-		return m, nil
+		// Adjust cursor if it's out of bounds after deletion
+		if activePane.cursor >= len(activePane.files)-1 && activePane.cursor > 0 {
+			activePane.cursor--
+		}
+		return m, tea.Batch(cmd, activePane.loadDirectoryCmd(activePane.path, ""))
 	case transferPlannedMsg:
+		var errCmd tea.Cmd
 		if len(msg.plan.rejected) > 0 {
-			m.err = errors.New(strings.Join(msg.plan.rejected, "; "))
+			errCmd = m.reportError(errors.New(strings.Join(msg.plan.rejected, "\n")))
 		}
 		m.isMoving = msg.move
 		m.operationDest = msg.destPath
@@ -581,19 +601,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toOverwrite = nil
 		m.isConfirmingOverwrite = len(msg.plan.conflicts) > 0
 		cmd = m.resolveConflicts()
-		return m, cmd
+		return m, tea.Batch(errCmd, cmd)
 	case fileOperationMsg: // For copy/move operations
-		if msg.err != nil {
-			m.err = msg.err
-		} else {
-			// Reload both source and destination panes
-			cmds := []tea.Cmd{m.leftPane.loadDirectoryCmd(""), m.rightPane.loadDirectoryCmd("")}
-			return m, tea.Batch(cmds...)
-		}
-		return m, nil
+		// Reload both panes even after a failure: part of the batch may have gone through.
+		cmd = m.reportError(msg.err)
+		return m, tea.Batch(cmd, m.leftPane.loadDirectoryCmd(m.leftPane.path, ""), m.rightPane.loadDirectoryCmd(m.rightPane.path, ""))
 	case driveUnmountedMsg:
 		if msg.err != nil {
-			m.err = msg.err
+			cmd = m.reportError(msg.err)
+			return m, cmd
 		} else {
 			// Refresh drives list after successful unmount
 			m.drives = getMountedDrives()
@@ -604,17 +620,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case previewReadyMsg:
-		m.previewContent = msg.Content
 		if msg.Err != nil {
-			m.err = msg.Err
+			m.isPreviewing = false
+			cmd = m.reportError(msg.Err)
+			return m, cmd
 		}
+		m.previewContent = msg.Content
 		return m, nil
 	default:
 		// logDebug("Unknown message: %T", msg)
 	}
 
 	// Delegate updates to active pane only if not in an operation mode
-	if !m.isCreatingFolder && !m.isDeleting && !m.isConfirmingOverwrite && !m.isPreviewing {
+	if !m.isCreatingFolder && !m.isDeleting && !m.isConfirmingOverwrite && !m.isPreviewing && !m.isLogOpen {
 		if m.leftPane.active {
 			m.leftPane, cmd = m.leftPane.update(msg)
 		} else {
@@ -622,6 +640,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, cmd
+}
+
+// applyListing installs a listing from loadDirectoryCmd. A listing of another path moves
+// the pane there; if loading it failed, the pane stays where it was with its old listing.
+// A failed reload of the pane's own path still carries "..", so there is a way out.
+func (p *pane) applyListing(msg directoryLoadedMsg) {
+	if msg.path != p.path {
+		if msg.err != nil {
+			return
+		}
+		p.path = msg.path
+		p.cursor = 0
+		p.viewportY = 0
+	}
+	p.files = msg.files
+	if msg.focusPath != "" {
+		for i, f := range p.files {
+			if f.Path == msg.focusPath {
+				p.cursor = i
+				// Adjust viewport to make cursor visible
+				if p.cursor >= p.viewportY+p.height-2 {
+					p.viewportY = p.cursor - p.height + 3
+				}
+				break
+			}
+		}
+	}
+	// Ensure cursor and viewport are within bounds after the listing shrank
+	ensureCursorInBounds(p)
+	p.viewportY = min(p.viewportY, p.cursor)
 }
 
 // update handles messages for a pane.
@@ -668,16 +716,9 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 				if selectedFile.IsDir {
 					// Check if it's the parent directory entry ".."
 					if selectedFile.IsParent {
-						currentPath := p.path
-						p.path = selectedFile.Path
-						p.cursor = 0
-						return p, p.loadDirectoryCmd(currentPath)
+						return p, p.loadDirectoryCmd(selectedFile.Path, p.path)
 					}
-
-					p.path = selectedFile.Path
-					p.cursor = 0    // Reset cursor when entering a new directory
-					p.viewportY = 0 // Reset viewport when entering a new directory
-					return p, p.loadDirectoryCmd("")
+					return p, p.loadDirectoryCmd(selectedFile.Path, "")
 				} else {
 					return p, openFileCmd(selectedFile.Path)
 				}

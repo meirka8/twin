@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,18 +16,21 @@ import (
 )
 
 // Commands
-func (p pane) loadDirectoryCmd(focusPath string) tea.Cmd {
+// loadDirectoryCmd lists path for the pane: its own path to reload, another one to navigate.
+func (p pane) loadDirectoryCmd(path, focusPath string) tea.Cmd {
 	return func() tea.Msg {
-		files, err := readDirectory(p.path)
-		return directoryLoadedMsg{paneID: p.id, files: files, err: err, focusPath: focusPath}
+		files, err := readDirectory(path)
+		return directoryLoadedMsg{paneID: p.id, path: path, files: files, err: err, focusPath: focusPath}
 	}
 }
 
 func openFileCmd(path string) tea.Cmd {
 	return func() tea.Msg {
 		cmd := exec.Command("xdg-open", path)
-		err := cmd.Run()
-		return fileOpenedMsg{err: err}
+		if err := cmd.Run(); err != nil {
+			return fileOpenedMsg{err: fmt.Errorf("open %s: %w", filepath.Base(path), err)}
+		}
+		return fileOpenedMsg{}
 	}
 }
 
@@ -45,7 +49,7 @@ func deleteFilesCmd(files []file) tea.Cmd {
 				continue // Never delete the parent through its ".." entry
 			}
 			var err error
-			if f.IsDir {
+			if f.IsDir && !f.IsSymlink { // A link is removed, never what it points to
 				err = os.RemoveAll(f.Path)
 			} else {
 				err = os.Remove(f.Path)
@@ -99,8 +103,13 @@ func previewFileCmd(path string) tea.Cmd {
 
 func unmountDriveCmd(path string) tea.Cmd {
 	return func() tea.Msg {
-		cmd := exec.Command("umount", path)
-		err := cmd.Run()
+		out, err := exec.Command("umount", path).CombinedOutput()
+		if err != nil {
+			if detail := strings.TrimSpace(string(out)); detail != "" {
+				err = errors.New(detail) // umount's own message names the reason
+			}
+			err = fmt.Errorf("unmount %s: %w", path, err)
+		}
 		return driveUnmountedMsg{err: err, drivePath: path}
 	}
 }

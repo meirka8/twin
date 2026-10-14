@@ -3,6 +3,7 @@ package main
 // Messages
 type directoryLoadedMsg struct {
 	paneID    int
+	path      string // Directory that was loaded; the pane moves there only on success
 	files     []file
 	err       error
 	focusPath string
@@ -43,4 +44,8 @@ type clipboardCopiedMsg struct {
 type driveUnmountedMsg struct {
 	err       error
 	drivePath string
+}
+
+type toastExpiredMsg struct {
+	id int
 }

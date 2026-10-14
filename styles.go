@@ -17,6 +17,9 @@ var (
 	confirmPromptStyle   = lipgloss.NewStyle().Background(lipgloss.Color("166")).Foreground(lipgloss.Color("255")).Padding(0, 1)
 	overwritePromptStyle = lipgloss.NewStyle().Background(lipgloss.Color("202")).Foreground(lipgloss.Color("0")).Padding(0, 1)
 	previewStyle         = lipgloss.NewStyle().Border(lipgloss.DoubleBorder(), true).BorderForeground(lipgloss.Color("205")).Padding(1, 2)
+	errorToastStyle      = lipgloss.NewStyle().Background(lipgloss.Color("160")).Foreground(lipgloss.Color("255")).Bold(true).Padding(0, 1)
+	logStyle             = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).BorderForeground(lipgloss.Color("160")).Padding(0, 1)
+	logTitleStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Bold(true)
 
 	// Hint Styles
 	modifierStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Padding(0, 1)

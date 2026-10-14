@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // View renders the application UI.
@@ -53,6 +54,16 @@ func (m model) View() string {
 			finalView = lipgloss.JoinHorizontal(lipgloss.Top, paneView(m.leftPane), previewView)
 		}
 		return lipgloss.JoinVertical(lipgloss.Left, finalView, m.statusBarView())
+	}
+
+	if m.isLogOpen {
+		var finalView string
+		if m.leftPane.active {
+			finalView = lipgloss.JoinHorizontal(lipgloss.Top, m.logView(), paneView(m.rightPane))
+		} else {
+			finalView = lipgloss.JoinHorizontal(lipgloss.Top, paneView(m.leftPane), m.logView())
+		}
+		return lipgloss.JoinVertical(lipgloss.Left, finalView, m.statusBarView(), m.hintsView())
 	}
 
 	if m.isFavoritesOpen {
@@ -106,6 +117,11 @@ func (m model) statusBarView() string {
 		}
 	}
 
+	if m.toast != "" {
+		width := max(m.leftPane.width+m.rightPane.width+2, 0) // Screen width minus padding
+		return errorToastStyle.Render(ansi.Truncate("! "+m.toast, width, "…"))
+	}
+
 	activePane := m.leftPane
 	if m.rightPane.active {
 		activePane = m.rightPane
@@ -144,9 +160,13 @@ func paneView(p pane) string {
 
 	for i := p.viewportY; i < len(p.files) && i < p.viewportY+p.height-2; i++ {
 		f := p.files[i]
-		line := " " + f.Name
+		name := f.Name
+		if f.IsSymlink {
+			name += "@" // As in ls -F
+		}
+		line := " " + name
 		if f.IsDir {
-			line = " " + dirStyle.Render(f.Name)
+			line = " " + dirStyle.Render(name)
 		}
 
 		_, isSelected := p.selected[f.Path]
@@ -294,4 +314,36 @@ func (m model) favoritesUnmountConfirmView() string {
 	}
 
 	return lipgloss.Place(activePane.width, activePane.height, lipgloss.Center, lipgloss.Center, content)
+}
+
+// logLines is the error log wrapped to the width of the log overlay, oldest first.
+func (m model) logLines() []string {
+	var lines []string
+	for _, e := range m.errLog {
+		lines = append(lines, calculateWrappedLines(e.time.Format("15:04:05 ")+e.text, m.leftPane.width-2)...)
+	}
+	return lines
+}
+
+// logView renders the error log in place of the active pane, newest entries at the bottom.
+func (m model) logView() string {
+	p := m.leftPane
+	if m.rightPane.active {
+		p = m.rightPane
+	}
+
+	lines := m.logLines()
+	end := len(lines) - min(m.logScrollY, m.maxLogScroll())
+	rows := append([]string{}, lines[max(end-m.logRows(), 0):end]...)
+	if len(lines) == 0 {
+		rows = []string{"No errors so far."}
+	}
+	for len(rows) < m.logRows() {
+		rows = append(rows, "")
+	}
+
+	title := logTitleStyle.Render(fmt.Sprintf("Error log (%d)", len(m.errLog)))
+	hint := "[↑/↓/PgUp/PgDn] Scroll  [Esc] Close"
+	content := lipgloss.JoinVertical(lipgloss.Left, title, strings.Join(rows, "\n"), hint)
+	return logStyle.Width(p.width).Height(p.height).Render(content)
 }

@@ -37,7 +37,7 @@ responsibility rather than by feature:
 - `update.go` — all `Update()` logic. This is the core control flow file. The top of `Update`
   is a chain of mutually-exclusive modal states checked in order — `isCreatingFolder`,
   `isDeleting`, `isConfirmingOverwrite`, `isFavoritesOpen` (with nested `isConfirmingUnmount`
-  / `isConfirmingRemoveFav` sub-states), `isPreviewing` — each intercepting key input for its
+  / `isConfirmingRemoveFav` sub-states), `isLogOpen`, `isPreviewing` — each intercepting key input for its
   own modal UI before falling through to normal two-pane navigation. Below that chain is a
   second switch that handles async result messages (`directoryLoadedMsg`, `fileOperationMsg`,
   etc.) that apply regardless of mode. Pane-local navigation (cursor movement, active search,
@@ -77,6 +77,12 @@ responsibility rather than by feature:
   per conflict (`resolveConflicts`) and only when every conflict is decided runs
   `transferFilesCmd` once for the clean files plus the ones chosen for overwriting. Esc
   cancels the whole batch. `transferFiles` re-checks the same safety rules.
+- Errors go through `m.reportError(err)`, which appends to the error log (Alt+L) and shows
+  a status-bar toast; return the command it gives back so the toast expires. Never drop an
+  error or store it without reporting it.
+- `loadDirectoryCmd(path, focusPath)` both reloads (the pane's own path) and navigates
+  (another path). The pane only moves to `path` once the listing succeeds, so don't set
+  `pane.path` yourself before loading.
 - Directory reloads pass an optional `focusPath` so the cursor can be restored to a specific
   entry after the reload (e.g. focus the newly created folder, or the parent's own path when
   navigating up via `..`).
