@@ -225,10 +225,10 @@ func removeTree(path string) error {
 		return nil
 	}
 	// WalkDir visits a directory before reading it, so it is readable by then.
-	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err == nil && d.IsDir() {
 			if info, err := d.Info(); err == nil {
-				os.Chmod(p, info.Mode()|0700)
+				_ = os.Chmod(p, info.Mode()|0700)
 			}
 		}
 		return nil // Best effort: RemoveAll below reports what is still in the way

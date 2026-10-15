@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    # A pull request from a branch of this repository was already checked on push;
+    # pull_request runs are for pull requests from forks.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Not gofmt-ed: $(echo "$unformatted" | tr '\n' ' ')"
+            gofmt -d .
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14
+
+  test:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Mount a tmpfs for the cross-device move test
+        run: |
+          sudo mkdir -p /mnt/twin-xdev
+          sudo mount -t tmpfs -o size=64m,mode=1777 tmpfs /mnt/twin-xdev
+      - name: go test
+        shell: bash # Runs with pipefail, so a failing test fails the step despite tee
+        env:
+          TWIN_XDEV_DIR: /mnt/twin-xdev
+        run: go test -race -count=1 -v ./... | tee "$RUNNER_TEMP/test.log"
+      - name: Check the cross-device move test ran
+        run: |
+          if ! grep -q -- '--- PASS: TestMoveAcrossRealDevices' "$RUNNER_TEMP/test.log"; then
+            echo "::error::TestMoveAcrossRealDevices was skipped: TWIN_XDEV_DIR is not on another filesystem"
+            exit 1
+          fi

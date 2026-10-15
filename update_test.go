@@ -211,7 +211,7 @@ func TestEnteringUnreadableDirectoryKeepsPaneWhereItWas(t *testing.T) {
 	if err := os.Mkdir(locked, 0); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod(locked, 0755) })
+	t.Cleanup(func() { _ = os.Chmod(locked, 0755) })
 	m := newTestModel(t, dir, dir)
 	before := len(m.leftPane.files)
 

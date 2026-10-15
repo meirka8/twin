@@ -288,7 +288,7 @@ func (m model) favoritesConfirmView() string {
 	}
 
 	var s strings.Builder
-	s.WriteString(fmt.Sprintf("Remove '%s' from favorites?\n\n", fav))
+	fmt.Fprintf(&s, "Remove '%s' from favorites?\n\n", fav)
 	s.WriteString("[y] Yes  [n] No")
 
 	content := popupConfirmStyle.Render(s.String())
@@ -303,7 +303,7 @@ func (m model) favoritesConfirmView() string {
 
 func (m model) favoritesUnmountConfirmView() string {
 	var s strings.Builder
-	s.WriteString(fmt.Sprintf("Unmount '%s'?\n\n", m.driveToUnmount))
+	fmt.Fprintf(&s, "Unmount '%s'?\n\n", m.driveToUnmount)
 	s.WriteString("[y] Yes  [n] No")
 
 	content := popupConfirmStyle.Render(s.String())
