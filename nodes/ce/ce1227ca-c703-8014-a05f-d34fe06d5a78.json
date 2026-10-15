@@ -1,0 +1,43 @@
+{
+  "interaction": {
+    "id": "ce1227ca-c703-8014-a05f-d34fe06d5a78",
+    "conversation_id": "fec0358e-0eee-4b6b-8277-469ec8e54796:agent-adb1dd240e72d2caf",
+    "parent_id": "dff63b91-9d1e-858b-923b-80b1a4db8b25",
+    "timestamp": "2026-10-14T19:14:18Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] gofmt rc=0\nvet rc=0\nstaticcheck missing/fail\n29\nok  \ttwin\t0.012s",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg2fRJfKhrqFN1aLyZmFL"
+  },
+  "context_items": [
+    {
+      "id": 7,
+      "interaction_id": "ce1227ca-c703-8014-a05f-d34fe06d5a78",
+      "file_path": "fs.go",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": 60,
+      "end_line": 339
+    }
+  ],
+  "tool_executions": [
+    {
+      "id": 79,
+      "interaction_id": "ce1227ca-c703-8014-a05f-d34fe06d5a78",
+      "tool_protocol": "native",
+      "tool_name": "Read",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/fs.go\",\"limit\":280,\"offset\":60}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "ce1227ca-c703-8014-a05f-d34fe06d5a78",
+      "git_commit_hash": "23d9832107e6aff510626c35ba30cfcc38941f1c",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

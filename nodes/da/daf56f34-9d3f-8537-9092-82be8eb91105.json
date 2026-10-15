@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "daf56f34-9d3f-8537-9092-82be8eb91105",
+    "conversation_id": "fec0358e-0eee-4b6b-8277-469ec8e54796",
+    "parent_id": "e0e27549-ed48-814e-9cec-53f9c8a4c9db",
+    "timestamp": "2026-10-14T19:13:40Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash error] Exit code 144\n--- FAIL: TestFavoritesOwnKeysWhileOpen (0.00s)\n    update_test.go:351: keys leaked to the pane: cursor 1, search \"jbdb\"\nFAIL\nFAIL\ttwin\t0.010s\nFAIL",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg2fNPauZCULVh9wB9Egn"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 72,
+      "interaction_id": "daf56f34-9d3f-8537-9092-82be8eb91105",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"git stash list; git status --short; ls shim_test.go 2>&1\",\"description\":\"Check stash and working tree state\"}",
+      "status": "failure"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "daf56f34-9d3f-8537-9092-82be8eb91105",
+      "git_commit_hash": "23d9832107e6aff510626c35ba30cfcc38941f1c",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

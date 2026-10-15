@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "5595fde4-d76a-8d7f-b536-5435a0c716ce",
+    "conversation_id": "fec0358e-0eee-4b6b-8277-469ec8e54796",
+    "parent_id": "ac7840b5-88f2-8f04-ae91-4d54dbdc0f5c",
+    "timestamp": "2026-10-14T19:17:44Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] ok  \ttwin\t0.011s\n--- PASS: TestMoveMergesIntoExistingDirectory (0.00s)\n--- PASS: TestMoveAcrossDevices (0.00s)\n--- PASS: TestFailedMoveAcrossDevicesKeepsSource (0.00s)\n--- PASS: TestMoveAcrossRealDevices (0.11s)\n--- PASS: TestMoveAcrossDevicesOntoSymlinkDoesNotWriteThroughIt (0.00s)\n--- PASS: TestMoveAcrossDevicesWithReadOnlyDirectories (0.00s)\nok  \ttwin\t0.119s",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": "Finally, the roadmap note on what atomic replacement changes:",
+    "source_request_id": "req_011Cg2fgV2qA4XozUMFgWgWY"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 89,
+      "interaction_id": "5595fde4-d76a-8d7f-b536-5435a0c716ce",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"python3 - <<'EOF'\\np='Twin — Roadmap.md'\\ns=open(p).read()\\na=\\\"copies keep mode and mtime, replace files atomically via a temp file and refuse FIFOs/devices;\\\"\\nassert s.count(a)==1\\ns=s.replace(a,\\\"copies keep mode and mtime, replace files atomically via a temp file (so an overwritten file becomes a new file: owned by the user, without its ACLs/xattrs, a symlink there is replaced instead of written through, other hard links keep the old content) and refuse FIFOs/devices; a directory is never copied or moved through a symlink at the destination;\\\")\\nopen(p,'w').write(s)\\nEOF\\ngit diff --stat\",\"description\":\"Document overwrite semantics in roadmap\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "5595fde4-d76a-8d7f-b536-5435a0c716ce",
+      "git_commit_hash": "23d9832107e6aff510626c35ba30cfcc38941f1c",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

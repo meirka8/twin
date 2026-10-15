@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "ac7840b5-88f2-8f04-ae91-4d54dbdc0f5c",
+    "conversation_id": "fec0358e-0eee-4b6b-8277-469ec8e54796",
+    "parent_id": "f646a638-a8d4-8cf7-a531-98a10cf9f413",
+    "timestamp": "2026-10-14T19:17:41Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 359:func testMoveMerges(t *testing.T, crossDevice bool) {\n360-\t{\n361-\t\tsrc, dst := t.TempDir(), t.TempDir()\n362-\t\tif crossDevice {\n363-\t\t\tsimulateCrossDevice(t)\n364-\t\t}\n365-\t\tmkdirs(t, src, \"dir/sub\")\n366-\t\tmkdirs(t, dst, \"dir/sub\")\n367-\t\twriteFiles(t, filepath.Join(src, \"dir\"), \"new\", \"moved\", \"both\")\n368-\t\twriteFiles(t, filepath.Join(src, \"dir\", \"sub\"), \"new\", \"deep\")\n369-\t\twriteFiles(t, filepath.Join(dst, \"dir\"), \"old\", \"kept\", \"both\")\n370-\n371-\t\tif err := transferFiles([]file{fileNamed(t, src, \"dir\")}, dst, true); err != nil {\n372-\t\t\tt.Fatalf(\"crossDevice=%v: %v\", crossDevice, err)\n373-\t\t}\n374-\t\tfor path, want := range map[string]string{\"moved\": \"new\", \"both\": \"new\", \"kept\": \"old\", \"sub/deep\": \"new\"} {\n375-\t\t\tif got := readFile(t, filepath.Join(dst, \"dir\", path)); got != want {\n376-\t\t\t\tt.Errorf(\"crossDevice=%v %s: got %q, want %q\", crossDevice, path, got, want)\n377-\t\t\t}\n378-\t\t}\n379-\t\tassertGone(t, filepath.Join(src, \"dir\"))\n380-\t}\n381-}\n382-\n383-func TestMoveAcrossDevices(t *testing.T) {\n384-\tsimulateCrossDevice(t)",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg2ffweTAxcz7pFBydhaf"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 88,
+      "interaction_id": "ac7840b5-88f2-8f04-ae91-4d54dbdc0f5c",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"python3 - <<'EOF'\\np='fs_test.go'\\nL=open(p).read().split('\\\\n')\\n# lines are 1-indexed: 360 '{' and 380 '}' \\nassert L[359].strip()=='{' and L[379].strip()=='}'\\nbody=[l[1:] if l.startswith('\\\\t\\\\t') else l for l in L[360:379]]\\nbody=[b.replace('t.Fatalf(\\\"crossDevice=%v: %v\\\", crossDevice, err)','t.Fatal(err)').replace('t.Errorf(\\\"crossDevice=%v %s: got %q, want %q\\\", crossDevice, path, got, want)','t.Errorf(\\\"%s: got %q, want %q\\\", path, got, want)') for b in body]\\nL=L[:359]+body+L[380:]\\nopen(p,'w').write('\\\\n'.join(L))\\nEOF\\nsed -i 's|^func testMoveMerges|// testMoveMerges moves a directory onto an existing one, by rename or across devices.\\\\nfunc testMoveMerges|' fs_test.go\\ngofmt -l .; go vet ./... && go test -count=1 ./... && TWIN_XDEV_DIR=$PWD go test -count=1 -run 'Device|Merge' -v . 2>&1 | grep -E \\\"^(---|ok|FAIL)\\\"; ls -a | grep twin-\",\"description\":\"Flatten helper, rerun tests incl. real cross-device\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "ac7840b5-88f2-8f04-ae91-4d54dbdc0f5c",
+      "git_commit_hash": "23d9832107e6aff510626c35ba30cfcc38941f1c",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "f646a638-a8d4-8cf7-a531-98a10cf9f413",
+    "conversation_id": "fec0358e-0eee-4b6b-8277-469ec8e54796",
+    "parent_id": "32216400-ed98-83c8-a0f0-71158bc8905c",
+    "timestamp": "2026-10-14T19:17:34Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] ok  \ttwin\t0.009s\nok  \ttwin\t1.030s",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": "Tidying up the leftover block in the subtest helper:",
+    "source_request_id": "req_011Cg2ffgzPaqnLJUHu8MEXm"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 87,
+      "interaction_id": "f646a638-a8d4-8cf7-a531-98a10cf9f413",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"grep -n \\\"func testMoveMerges\\\" -A 25 fs_test.go\",\"description\":\"Show subtest helper\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "f646a638-a8d4-8cf7-a531-98a10cf9f413",
+      "git_commit_hash": "23d9832107e6aff510626c35ba30cfcc38941f1c",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

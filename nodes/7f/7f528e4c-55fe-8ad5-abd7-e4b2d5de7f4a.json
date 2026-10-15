@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "7f528e4c-55fe-8ad5-abd7-e4b2d5de7f4a",
+    "conversation_id": "fec0358e-0eee-4b6b-8277-469ec8e54796",
+    "parent_id": "bf9491f8-082e-8ed2-9633-d1a2eded8bc0",
+    "timestamp": "2026-10-14T19:22:53Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 423bda4 Merge pull request #40 from meirka8/render-errors\n2b5480d Show errors, recover from unreadable directories, handle symlinks\ne2358e8 Merge pull request #39 from meirka8/fix-data-safety\ncontained",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg2g4ykqZPut7JBTy1kKL"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 92,
+      "interaction_id": "7f528e4c-55fe-8ad5-abd7-e4b2d5de7f4a",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"git add \\\"Twin — Roadmap.md\\\" fs.go fs_test.go go.mod update.go update_test.go && git commit -q -F - <<'EOF'\\nMove across filesystems, keep file attributes, stop favorites key leak\\n\\nClose the last High bugs of Phase 0:\\n\\n- Moves fall back to copy, flush (syncfs) and delete when rename fails\\n  with EXDEV, so moving to a USB drive works. A failed copy leaves the\\n  source untouched and removes its partial copy, including read-only\\n  directories. A directory moved onto an existing one is merged.\\n- Copies keep mode and mtime, can copy read-only directories, replace\\n  files atomically through a temporary file, and refuse FIFOs and\\n  devices instead of hanging on them. A directory is never copied or\\n  moved through a symlink at the destination.\\n- The favorites popup no longer passes keys through to the pane.\\n\\nCross-device moves are tested by simulating EXDEV; TestMoveAcrossRealDevices\\nruns a real one when TWIN_XDEV_DIR points at another filesystem.\\n\\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\\nEOF\\ngit push -q -u origin finish-phase0-high 2>&1 | tail -2; git log --oneline -1\",\"description\":\"Commit and push the branch\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "7f528e4c-55fe-8ad5-abd7-e4b2d5de7f4a",
+      "git_commit_hash": "23d9832107e6aff510626c35ba30cfcc38941f1c",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}
