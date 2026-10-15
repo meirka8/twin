@@ -632,7 +632,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Delegate updates to active pane only if not in an operation mode
-	if !m.isCreatingFolder && !m.isDeleting && !m.isConfirmingOverwrite && !m.isPreviewing && !m.isLogOpen {
+	if !m.isCreatingFolder && !m.isDeleting && !m.isConfirmingOverwrite && !m.isFavoritesOpen && !m.isPreviewing && !m.isLogOpen {
 		if m.leftPane.active {
 			m.leftPane, cmd = m.leftPane.update(msg)
 		} else {

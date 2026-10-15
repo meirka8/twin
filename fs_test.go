@@ -1,9 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"testing"
+	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // writeFiles creates each name in dir with the given content.
@@ -241,5 +247,290 @@ func TestTransferRefusesOverwritingSourceUnderAnotherName(t *testing.T) {
 		if got := readFile(t, filepath.Join(b, name)); got != "keep" {
 			t.Errorf("%s: got %q", name, got)
 		}
+	}
+}
+
+// simulateCrossDevice makes every rename fail as it does between two filesystems.
+// It swaps the package-level rename, so tests that move files must not run in parallel.
+func simulateCrossDevice(t *testing.T) {
+	t.Helper()
+	rename = func(oldpath, newpath string) error {
+		return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+	}
+	t.Cleanup(func() { rename = os.Rename })
+}
+
+// mkdirs creates each directory path under root.
+func mkdirs(t *testing.T, root string, paths ...string) {
+	t.Helper()
+	for _, p := range paths {
+		if err := os.MkdirAll(filepath.Join(root, p), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// assertGone fails the test if path still exists.
+func assertGone(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Lstat(path); !os.IsNotExist(err) {
+		t.Errorf("%s still exists (%v)", path, err)
+	}
+}
+
+func TestCopyPreservesModeAndModTime(t *testing.T) {
+	src, dst := t.TempDir(), t.TempDir()
+	mkdirs(t, src, "dir")
+	writeFiles(t, filepath.Join(src, "dir"), "data", "f")
+	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	f, d := filepath.Join(src, "dir", "f"), filepath.Join(src, "dir")
+	if err := os.Chmod(f, 0640); err != nil {
+		t.Fatal(err)
+	}
+	// A read-only source directory must still be copyable.
+	for _, p := range []string{f, d} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(d, 0555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(d, 0755); os.Chmod(filepath.Join(dst, "dir"), 0755) })
+
+	if err := transferFiles([]file{fileNamed(t, src, "dir")}, dst, false); err != nil {
+		t.Fatal(err)
+	}
+	for path, mode := range map[string]os.FileMode{"dir": 0555, "dir/f": 0640} {
+		info, err := os.Stat(filepath.Join(dst, path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != mode || !info.ModTime().Equal(old) {
+			t.Errorf("%s: mode %v, mtime %v", path, info.Mode().Perm(), info.ModTime())
+		}
+	}
+}
+
+func TestCopyOverwriteLeavesNoTemporaryFiles(t *testing.T) {
+	src, dst := t.TempDir(), t.TempDir()
+	writeFiles(t, src, "new", "f")
+	writeFiles(t, dst, "old", "f")
+
+	if err := transferFiles([]file{fileNamed(t, src, "f")}, dst, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(dst, "f")); got != "new" {
+		t.Fatalf("got %q", got)
+	}
+	if entries, _ := os.ReadDir(dst); len(entries) != 1 {
+		t.Fatalf("expected only f in destination, got %v", entries)
+	}
+}
+
+func TestCopyRefusesSpecialFiles(t *testing.T) {
+	src, dst := t.TempDir(), t.TempDir()
+	mkdirs(t, src, "dir")
+	if err := unix.Mkfifo(filepath.Join(src, "dir", "fifo"), 0644); err != nil {
+		t.Skip("cannot create a FIFO:", err)
+	}
+
+	// Opening the FIFO for reading would block forever.
+	done := make(chan error, 1)
+	go func() { done <- transferFiles([]file{fileNamed(t, src, "dir")}, dst, false) }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("copying a FIFO must fail")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("copying a FIFO blocked")
+	}
+}
+
+func TestMoveMergesIntoExistingDirectory(t *testing.T) {
+	for _, crossDevice := range []bool{false, true} {
+		t.Run(fmt.Sprint("crossDevice=", crossDevice), func(t *testing.T) {
+			testMoveMerges(t, crossDevice)
+		})
+	}
+}
+
+// testMoveMerges moves a directory onto an existing one, by rename or across devices.
+func testMoveMerges(t *testing.T, crossDevice bool) {
+	src, dst := t.TempDir(), t.TempDir()
+	if crossDevice {
+		simulateCrossDevice(t)
+	}
+	mkdirs(t, src, "dir/sub")
+	mkdirs(t, dst, "dir/sub")
+	writeFiles(t, filepath.Join(src, "dir"), "new", "moved", "both")
+	writeFiles(t, filepath.Join(src, "dir", "sub"), "new", "deep")
+	writeFiles(t, filepath.Join(dst, "dir"), "old", "kept", "both")
+
+	if err := transferFiles([]file{fileNamed(t, src, "dir")}, dst, true); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{"moved": "new", "both": "new", "kept": "old", "sub/deep": "new"} {
+		if got := readFile(t, filepath.Join(dst, "dir", path)); got != want {
+			t.Errorf("%s: got %q, want %q", path, got, want)
+		}
+	}
+	assertGone(t, filepath.Join(src, "dir"))
+}
+
+func TestMoveAcrossDevices(t *testing.T) {
+	simulateCrossDevice(t)
+	src, dst := t.TempDir(), t.TempDir()
+	mkdirs(t, src, "dir/sub")
+	writeFiles(t, src, "new", "f")
+	writeFiles(t, filepath.Join(src, "dir", "sub"), "deep", "g")
+	if err := os.Symlink("sub/g", filepath.Join(src, "dir", "link")); err != nil {
+		t.Fatal(err)
+	}
+	writeFiles(t, dst, "old", "f") // Overwritten, as if confirmed
+	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(src, "f"), old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	sources := []file{fileNamed(t, src, "f"), fileNamed(t, src, "dir")}
+	if err := transferFiles(sources, dst, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(dst, "f")); got != "new" {
+		t.Errorf("f: got %q", got)
+	}
+	if info, err := os.Stat(filepath.Join(dst, "f")); err != nil || !info.ModTime().Equal(old) {
+		t.Errorf("f: mtime not kept (%v)", err)
+	}
+	if got := readFile(t, filepath.Join(dst, "dir", "sub", "g")); got != "deep" {
+		t.Errorf("dir/sub/g: got %q", got)
+	}
+	if got, err := os.Readlink(filepath.Join(dst, "dir", "link")); err != nil || got != "sub/g" {
+		t.Errorf("dir/link: got %q (%v)", got, err)
+	}
+	assertGone(t, filepath.Join(src, "f"))
+	assertGone(t, filepath.Join(src, "dir"))
+}
+
+func TestFailedMoveAcrossDevicesKeepsSource(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read the unreadable file")
+	}
+	simulateCrossDevice(t)
+	src, dst := t.TempDir(), t.TempDir()
+	mkdirs(t, src, "dir")
+	writeFiles(t, filepath.Join(src, "dir"), "data", "a", "secret")
+	if err := os.Chmod(filepath.Join(src, "dir", "secret"), 0); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := transferFiles([]file{fileNamed(t, src, "dir")}, dst, true); err == nil {
+		t.Fatal("expected the unreadable file to fail the move")
+	}
+	if got := readFile(t, filepath.Join(src, "dir", "a")); got != "data" {
+		t.Errorf("source changed: %q", got)
+	}
+	assertGone(t, filepath.Join(dst, "dir")) // No partial copy left behind
+}
+
+// TestMoveAcrossRealDevices moves into $TWIN_XDEV_DIR, which must be on another
+// filesystem than the system temp directory (e.g. a tmpfs mount in CI).
+func TestMoveAcrossRealDevices(t *testing.T) {
+	root := os.Getenv("TWIN_XDEV_DIR")
+	if root == "" {
+		t.Skip("TWIN_XDEV_DIR not set")
+	}
+	src := t.TempDir()
+	dst, err := os.MkdirTemp(root, "twin-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dst) })
+	var srcStat, dstStat unix.Stat_t
+	if unix.Stat(src, &srcStat) != nil || unix.Stat(dst, &dstStat) != nil || srcStat.Dev == dstStat.Dev {
+		t.Skip("TWIN_XDEV_DIR is on the same filesystem as the temp directory")
+	}
+	mkdirs(t, src, "dir")
+	writeFiles(t, filepath.Join(src, "dir"), "data", "f")
+
+	if err := transferFiles([]file{fileNamed(t, src, "dir")}, dst, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(dst, "dir", "f")); got != "data" {
+		t.Errorf("got %q", got)
+	}
+	assertGone(t, filepath.Join(src, "dir"))
+}
+
+func TestMoveAcrossDevicesOntoSymlinkDoesNotWriteThroughIt(t *testing.T) {
+	simulateCrossDevice(t)
+	src, dst, other := t.TempDir(), t.TempDir(), t.TempDir()
+	mkdirs(t, src, "proj")
+	writeFiles(t, filepath.Join(src, "proj"), "new", "f")
+	writeFiles(t, other, "precious", "f")
+	if err := os.Symlink(other, filepath.Join(dst, "proj")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := transferFiles([]file{fileNamed(t, src, "proj")}, dst, true); err == nil {
+		t.Fatal("expected the move onto a symlink to fail")
+	}
+	if got := readFile(t, filepath.Join(other, "f")); got != "precious" {
+		t.Errorf("link target overwritten: %q", got)
+	}
+	if got := readFile(t, filepath.Join(src, "proj", "f")); got != "new" {
+		t.Errorf("source changed: %q", got)
+	}
+}
+
+func TestMoveAcrossDevicesWithReadOnlyDirectories(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	simulateCrossDevice(t)
+	src, dst := t.TempDir(), t.TempDir()
+	mkdirs(t, src, "ok/ro", "bad/ro")
+	writeFiles(t, filepath.Join(src, "ok", "ro"), "data", "f")
+	writeFiles(t, filepath.Join(src, "bad", "ro"), "data", "f")
+	writeFiles(t, filepath.Join(src, "bad"), "data", "secret") // Copied after ro/
+	if err := os.Chmod(filepath.Join(src, "bad", "secret"), 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{"ok/ro", "bad/ro"} {
+		if err := os.Chmod(filepath.Join(src, d), 0555); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { removeTree(src); removeTree(dst) })
+
+	// The source is removed even though it holds a read-only directory.
+	if err := transferFiles([]file{fileNamed(t, src, "ok")}, dst, true); err != nil {
+		t.Fatal(err)
+	}
+	assertGone(t, filepath.Join(src, "ok"))
+	if got := readFile(t, filepath.Join(dst, "ok", "ro", "f")); got != "data" {
+		t.Errorf("ok/ro/f: got %q", got)
+	}
+
+	// A failed copy is cleaned up even though it holds a read-only directory.
+	if err := transferFiles([]file{fileNamed(t, src, "bad")}, dst, true); err == nil {
+		t.Fatal("expected the unreadable file to fail the move")
+	}
+	assertGone(t, filepath.Join(dst, "bad"))
+}
+
+func TestCopyLongFileName(t *testing.T) {
+	src, dst := t.TempDir(), t.TempDir()
+	name := strings.Repeat("n", 250)
+	writeFiles(t, src, "data", name)
+	writeFiles(t, dst, "old", name)
+
+	if err := transferFiles([]file{fileNamed(t, src, name)}, dst, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(dst, name)); got != "data" {
+		t.Errorf("got %q", got)
 	}
 }
