@@ -19,12 +19,18 @@ go run .              # run the app
 go build .            # build the ./twin binary
 go vet ./...          # static checks
 gofmt -l .            # check formatting
+golangci-lint run     # standard linters, configured in .golangci.yml
 go test ./...         # run the tests
 ```
 
+CI (`.github/workflows/ci.yml`) runs all of these on every push and must stay green: fix lint
+findings rather than adding exclusions. It also sets `TWIN_XDEV_DIR` to a tmpfs so
+`TestMoveAcrossRealDevices` runs a real cross-filesystem move, and fails if that test skips.
+
 `fs_test.go` covers the filesystem helpers with `t.TempDir()`. `update_test.go` drives
 `Update` with key messages and runs the returned commands (see its `send` helper), which is
-how to test anything that goes through the modal flow.
+how to test anything that goes through the modal flow. `docs_test.go` checks that the
+shortcut table in DOCUMENTATION.md matches `keys.go`.
 
 ## Architecture
 
@@ -56,7 +62,7 @@ responsibility rather than by feature:
   optional F-key alias. `GetAliasMap()` maps F-key aliases back to their canonical key string;
   `Update` resolves incoming key events through this map before switching on `m.keyMap.X.Key`,
   so a new shortcut must be added to `KeyMap` (and `GetShortcuts()`) rather than matched as a
-  raw string.
+  raw string, and to the shortcut table in DOCUMENTATION.md.
 - `view.go` — `View()` and the render helpers for the two panes, status bar, hints bar, and the
   full-screen preview/favorites overlays. Overlays replace one or both panes rather than
   layering on top.

@@ -296,7 +296,7 @@ func TestCopyPreservesModeAndModTime(t *testing.T) {
 	if err := os.Chmod(d, 0555); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod(d, 0755); os.Chmod(filepath.Join(dst, "dir"), 0755) })
+	t.Cleanup(func() { _ = os.Chmod(d, 0755); _ = os.Chmod(filepath.Join(dst, "dir"), 0755) })
 
 	if err := transferFiles([]file{fileNamed(t, src, "dir")}, dst, false); err != nil {
 		t.Fatal(err)
@@ -447,7 +447,7 @@ func TestMoveAcrossRealDevices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dst) })
+	t.Cleanup(func() { _ = os.RemoveAll(dst) })
 	var srcStat, dstStat unix.Stat_t
 	if unix.Stat(src, &srcStat) != nil || unix.Stat(dst, &dstStat) != nil || srcStat.Dev == dstStat.Dev {
 		t.Skip("TWIN_XDEV_DIR is on the same filesystem as the temp directory")
@@ -503,7 +503,7 @@ func TestMoveAcrossDevicesWithReadOnlyDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	t.Cleanup(func() { removeTree(src); removeTree(dst) })
+	t.Cleanup(func() { _ = removeTree(src); _ = removeTree(dst) })
 
 	// The source is removed even though it holds a read-only directory.
 	if err := transferFiles([]file{fileNamed(t, src, "ok")}, dst, true); err != nil {

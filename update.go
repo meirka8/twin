@@ -523,9 +523,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle messages that are always processed
 	switch msg := msg.(type) {
 	case directoryLoadedMsg:
-		if msg.paneID == m.leftPane.id {
+		switch msg.paneID {
+		case m.leftPane.id:
 			m.leftPane.applyListing(msg)
-		} else if msg.paneID == m.rightPane.id {
+		case m.rightPane.id:
 			m.rightPane.applyListing(msg)
 		}
 		cmd = m.reportError(msg.err)
@@ -536,23 +537,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.WindowSizeMsg:
-		// Handle window resizing
-		// Height includes:
-		// - Status bar (1 line)
-		// - Hint panel (approx 3 lines: 1 text + 2 border)
-		// - Borders (2 lines for top/bottom of pane?)
-		// Let's account for 4 lines of overhead separate from pane borders.
-		paneHeight := msg.Height - 1 - 4 // Adjust for status bar (1) and hints (3) and maybe some breathing room?
-		// Previously it was -1 -2. 1 for status, 2 for borders?
-		// If we have top border and bottom border on panes, that's inside paneView rendering usually or accounted for here.
-		// Let's try reducing height by 5 total to be safe: 1 (status) + 3 (hints).
-		// Wait, original was `msg.Height - 1 - 2`.
-		// If hints are new, we need to subtract their height.
-		// Hint panel height = 3 (1 text + 2 border).
-		// So we need to subtract 3 more than before.
-		// New calculation: msg.Height - 1 (status) - 3 (hints) - 2 (pane borders overhead if any, previously 2)
-		// Total subtraction: 6.
-		paneHeight = msg.Height - 6
+		// Below the panes: the status bar (1 line) and the hint bar (3: text and padding).
+		// The pane borders (2) are added around the height when rendering.
+		paneHeight := msg.Height - 1 - 3 - 2
 		paneWidth := msg.Width/2 - 2
 		m.leftPane.height = paneHeight
 		m.rightPane.height = paneHeight

@@ -22,10 +22,9 @@ func fuzzyMatch(query, target string) bool {
 	}
 
 	queryRunes := []rune(strings.ToLower(query))
-	targetRunes := []rune(strings.ToLower(target))
 
 	qIdx := 0
-	for _, t := range targetRunes {
+	for _, t := range strings.ToLower(target) {
 		if qIdx < len(queryRunes) && t == queryRunes[qIdx] {
 			qIdx++
 		}

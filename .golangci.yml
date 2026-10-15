@@ -1,0 +1,12 @@
+version: "2"
+
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  exclusions:
+    rules:
+      # Close on a file that was only read cannot lose data; files that were written are
+      # closed explicitly and their error checked. Every other unchecked error, os.Remove
+      # included, must be handled or discarded with `_ =`.
+      - linters: [errcheck]
+        text: "Error return value of `.*\\.Close` is not checked"

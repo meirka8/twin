@@ -118,13 +118,13 @@ func copyToClipboardCmd(text string) tea.Cmd {
 	return func() tea.Msg {
 		err := clipboard.WriteAll(text)
 		if err != nil {
-			// Fallback to OSC 52
-			osc52.New(text).WriteTo(os.Stderr)
-			// We don't return the error if OSC 52 "succeeds" (it just writes to stderr)
-			// But strictly speaking we don't know if the terminal handled it.
-			// However, it's better than failing.
-			return clipboardCopiedMsg{err: nil}
+			// Fall back to OSC 52. Whether the terminal honours it cannot be known, so
+			// only a failure to write the sequence at all is reported.
+			if _, oscErr := osc52.New(text).WriteTo(os.Stderr); oscErr != nil {
+				// One line: reportError logs every line of an error as an entry of its own.
+				return clipboardCopiedMsg{err: fmt.Errorf("copy to clipboard: %v; OSC 52 fallback: %w", err, oscErr)}
+			}
 		}
-		return clipboardCopiedMsg{err: err}
+		return clipboardCopiedMsg{}
 	}
 }
