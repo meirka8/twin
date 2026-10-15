@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "870e045a-fef9-892c-8c85-749b51a311c5",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "06138568-b7df-801e-a803-07e15eab9e03",
+    "timestamp": "2026-10-15T09:05:52Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] \tt.Cleanup(func() { os.Chmod(d, 0755); os.Chmod(filepath.Join(dst, \"dir\"), 0755) })\n\tt.Cleanup(func() { removeTree(src); removeTree(dst) })\n\tt.Cleanup(func() { os.Chmod(locked, 0755) })",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3kq43zm5NNigWfLExcT"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 119,
+      "interaction_id": "870e045a-fef9-892c-8c85-749b51a311c5",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"sed -i '299s|{ os.Chmod(d, 0755); os.Chmod(|{ _ = os.Chmod(d, 0755); _ = os.Chmod(|; 506s|{ removeTree(src); removeTree(dst) }|{ _ = removeTree(src); _ = removeTree(dst) }|' fs_test.go && sed -i '214s|{ os.Chmod(locked, 0755) }|{ _ = os.Chmod(locked, 0755) }|' update_test.go && sed -n 299p fs_test.go; sed -n 506p fs_test.go; sed -n 214p update_test.go\",\"description\":\"Make test cleanup ignores explicit\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "870e045a-fef9-892c-8c85-749b51a311c5",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

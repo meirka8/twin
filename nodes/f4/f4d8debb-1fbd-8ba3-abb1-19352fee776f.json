@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "f4d8debb-1fbd-8ba3-abb1-19352fee776f",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422:agent-ab48af1d8c72685fa",
+    "parent_id": "63e47e60-1074-8c45-bf7d-5b643d486b5f",
+    "timestamp": "2026-10-15T09:13:27Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] origin\tgit@github.com:meirka8/twin.git (fetch)\norigin\tgit@github.com:meirka8/twin.git (push)\n3d3c42e5aac5ba805825da76410c181273ba90b1\trefs/tags/v7\n9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0\trefs/tags/v7.0.0\n3d3c42e5aac5ba805825da76410c181273ba90b1\trefs/tags/v7.0.1\nb7ad1dad31e06c5925ef5d2fc7ad053ef454303e\trefs/tags/v7\nb7ad1dad31e06c5925ef5d2fc7ad053ef454303e\trefs/tags/v7.0.0\n82606bf257cbaff209d206a39f5134f0cfbfd2ee\trefs/tags/v9.2.1^{}\nd583c34f0599d37dbac4a198b9c83201be380893\trefs/tags/v9.3.0\nba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a\trefs/tags/v9.3.0^{}\n793d05316077345337ae9a11ae05ec8f23edfe1b\trefs/tags/v2.14.0\n114493f9b3e7257d29e4130f2b4a4aadefbb6845\trefs/tags/v2.14.0^{}",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mNw4TiKTGgqVUDvcBu"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 157,
+      "interaction_id": "f4d8debb-1fbd-8ba3-abb1-19352fee776f",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"env TWIN_XDEV_DIR=/dev/shm go test -race -count=1 -v -run 'TestMoveAcrossRealDevices' . 2>&1 | tail -5; echo \\\"pipe status: $pipestatus\\\"\",\"description\":\"Run the real cross-device move test against /dev/shm\",\"timeout\":200000}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "f4d8debb-1fbd-8ba3-abb1-19352fee776f",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "04a47ae6-55ca-895a-8afa-c8cf9ed127d5",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "b72934fd-aeec-85c3-b92e-cc3da037e83d",
+    "timestamp": "2026-10-15T09:06:07Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 0 issues.\nlint exit 0\nok  \ttwin\t1.026s",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": "Lint is clean and the tests pass under `-race`. Next I'm running the real cross-device test against a tmpfs locally (`/dev/shm`), the same way CI will run it.",
+    "source_request_id": "req_011Cg3krCvpqhBmE5E3PGgPZ"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 122,
+      "interaction_id": "04a47ae6-55ca-895a-8afa-c8cf9ed127d5",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"stat -f -c '%T' /dev/shm /tmp; TWIN_XDEV_DIR=/dev/shm go test -count=1 -run 'TestMoveAcrossRealDevices$' -v . 2>&1 | tail -4\",\"description\":\"Run real cross-device move test on tmpfs\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "04a47ae6-55ca-895a-8afa-c8cf9ed127d5",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "673468c5-6e1c-8d15-8a27-27cfacacc209",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "171d7cde-192e-816b-807b-2ffbbaef20b1",
+    "timestamp": "2026-10-15T09:03:38Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] }\n\n// TestMoveAcrossRealDevices moves into $TWIN_XDEV_DIR, which must be on another\n// filesystem than the system temp directory (e.g. a tmpfs mount in CI).\nfunc TestMoveAcrossRealDevices(t *testing.T) {\n\troot := os.Getenv(\"TWIN_XDEV_DIR\")\n\tif root == \"\" {\n\t\tt.Skip(\"TWIN_XDEV_DIR not set\")\n\t}\n\tsrc := t.TempDir()\n\tdst, err := os.MkdirTemp(root, \"twin-test-\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tt.Cleanup(func() { os.RemoveAll(dst) })\n\tvar srcStat, dstStat unix.Stat_t\n\tif unix.Stat(src, &srcStat) != nil || unix.Stat(dst, &dstStat) != nil || srcStat.Dev == dstStat.Dev {\n\t\tt.Skip(\"TWIN_XDEV_DIR is on the same filesystem as the temp directory\")\n\t}\n\tmkdirs(t, src, \"dir\")\n\twriteFiles(t, filepath.Join(src, \"dir\"), \"data\", \"f\")\n\n\tif err := transferFiles([]file{fileNamed(t, src, \"dir\")}, dst, true); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif got := readFile(t, filepath.Join(dst, \"dir\", \"f\")); got != \"data\" {\n\t\tt.Errorf(\"got %q\", got)\n\t}\n\tassertGone(t, filepath.Join(src, \"dir\"))\n}\n\n---\nname: go-reviewer\ndescription: Senior Go reviewer for this repository. Use it before any commit that touches Go code, and whenever asked to review Go changes. It reads the diff and the changed files, runs gofmt, go vet, staticcheck, and the tests, and returns findings with file:line references and concrete fixes. It never edits files or runs git commands that change state.\nmodel: inherit\ntools: Read, Grep, Glob, Bash\ncolor: cyan\n---\n\nYou are a senior Go engineer reviewing a change in this repository. You review; you do not fix. You never create, edit, or delete files, and you never run `git add`, `git commit`, `git push`, `git stash`, or `git checkout`. If a check cannot run, say so instead of guessing.\n\n## Procedure\n\n1. Establish the change set. Run `git status --short` and `git diff` (both staged and unstaged). If the request names a base branch or commit range, diff against that instead. List the changed Go files before reading anything else.\n2. Read every changed Go file in full with Read, not only the hunks. For each changed function, find its callers with Grep and read enough of them to judge the contract.\n3. Run the checks from the repository root and record the exact output:\n   - `gofmt -l .`\n   - `go vet ./...`\n   - `staticcheck ./...` (skip with a note if the binary is missing)\n   - `go test ./... -count=1`, adding `-race` when the change touches goroutines, channels, or shared state\n4. Review against the checklist below, then write the report.\n\n## Checklist\n\n- **Errors.** Every error is handled or returned with context (`fmt.Errorf(\"...: %w\", err)`); none is discarded with `_` or logged and forgotten. Where this repository has an error-reporting convention (see its CLAUDE.md), the change follows it exactly.\n- **Filesystem.** `filepath.Join` rather than string concatenation; `os.Lstat` when symlinks matter; files and directories closed with `defer` on every path; partial failures (copy, move, delete) leave the user's data in a known state and are reported.\n- **Update loop.** If the code follows the model/message/command pattern (Elm style): `Update` handles every message it can receive, commands are pure functions that return messages, goroutines never mutate the model directly, and state transitions cannot strand the UI (empty pane, stale path, lost selection).\n- **Concurrency.** No data races, no goroutine leaks, channels closed by the sender only, contexts honoured for cancellation.\n- **Correctness.** Nil and zero-value behaviour, off-by-one in slices and indices, Unicode-safe string handling (`[]rune` where characters matter), path edge cases (`..`, trailing separators, symlink cycles).\n- **Tests.** New behaviour has tests; tests use `t.TempDir()` and table-driven cases, never sleep for synchronisation, and fail for the right reason. Note untested branches explicitly.\n- **Idiom.** Effective Go naming, small interfaces, no premature abstraction, no exported identifiers without a reason, comments that say why rather than what.\n\n## Report format\n\nStart with one line: **Verdict: approve** or **Verdict: needs changes**.\n\nThen findings, most severe first, each as:\n\n- `path/file.go:LINE` — what is wrong, in one sentence; why it matters, in one sentence; the fix as a short code snippet or an exact instruction.\n\nSeverity order: data loss or corruption, incorrect behaviour the user sees, race or leak, silent error, test gap, idiom. Omit praise and padding. If there are no findings at a severity, do not mention that severity.\n{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"hooks\": [\n          {\n            \"command\": \"'/home/meirk/.cvc/bin/cvc' ingest claude-code --hook\",\n            \"timeout\": 30,\n            \"type\": \"command\"\n          }\n        ]\n      }\n    ],\n    \"SessionEnd\": [\n      {\n        \"hooks\": [\n          {\n            \"command\": \"'/home/meirk/.cvc/bin/cvc' ingest claude-code --hook\",\n            \"timeout\": 30,\n            \"type\": \"command\"\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"command\": \"'/home/meirk/.cvc/bin/cvc' ingest claude-code --hook\",\n            \"timeout\": 30,\n            \"type\": \"command\"\n          }\n        ]\n      }\n    ]\n  }\n}",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3kasY6RewuVVhbUhkNe"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 106,
+      "interaction_id": "673468c5-6e1c-8d15-8a27-27cfacacc209",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"for r in actions/checkout actions/setup-go golangci/golangci-lint-action golangci/golangci-lint; do echo \\\"$r: $(gh api repos/$r/releases/latest --jq .tag_name 2>&1)\\\"; done; git show 23d9832 --stat; git show 23d9832 -- \\\"Twin — Roadmap.md\\\" | head -60\",\"description\":\"Check latest action versions and prior roadmap edits\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "673468c5-6e1c-8d15-8a27-27cfacacc209",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

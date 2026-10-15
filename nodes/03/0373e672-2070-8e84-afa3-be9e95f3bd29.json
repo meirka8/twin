@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "0373e672-2070-8e84-afa3-be9e95f3bd29",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "30d182a9-4f84-8e5e-b0e3-5d794e708bf3",
+    "timestamp": "2026-10-15T09:18:07Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] or moved through a symlink at the destination.\n\n**Moving** renames within a filesystem. Across filesystems (to a USB drive, for example) Twin\ncopies, flushes the copy to disk, and only then removes the source. If the copy fails, the source\nis untouched and the partial copy is removed.\n\nWhen a batch finishes, both panes reload. A failed entry does not stop the others; each failure\ngoes to the error log. There is no progress display yet: a large copy runs in the background and\nthe panes update when it is done.\n\n## Errors\n\nTwin never fails silently. A failure shows in red in the status bar for five seconds; when a\ncopy or move had several failures, the toast names the first and counts the rest. Every error is kept in\nthe error log (Alt+L) with the time it happened, up to the last 500, until Twin quits.\n\nThe log opens in place of the active pane, newest entry at the bottom:",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mkqQWC5U1kRMmRr2uk"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 173,
+      "interaction_id": "0373e672-2070-8e84-afa3-be9e95f3bd29",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"python3 - <<'EOF'\\np='DOCUMENTATION.md'\\ns=open(p).read()\\nsubs=[\\n(\\\"\\\"\\\"Every shortcut has an Alt binding; the classic ones also answer to the Midnight Commander\\nfunction key.\\\"\\\"\\\",\\n\\\"\\\"\\\"Most shortcuts are Alt+letter; the classic ones also answer to the Midnight Commander function\\nkey.\\\"\\\"\\\"),\\n(\\\"\\\"\\\"**Moving** renames within a filesystem. Across filesystems (to a USB drive, for example) Twin\\ncopies, flushes the copy to disk, and only then removes the source. If the copy fails, the source\\nis untouched and the partial copy is removed.\\n\\nWhen a batch finishes, both panes reload. A failed entry does not stop the others; each failure\\ngoes to the error log. There is no progress display yet: a large copy runs in the background and\\nthe panes update when it is done.\\\"\\\"\\\",\\n\\\"\\\"\\\"**Moving** renames within a filesystem. Across filesystems (to a USB drive, for example) Twin\\ncopies, flushes the copy to disk, and only then removes the source; if the copy fails, the source\\nis untouched and nothing half-copied is left behind. A directory moved onto an existing directory\\nis merged into it entry by entry, each entry moved this way. If one fails, the merge stops there:\\nthe entries moved before it stay moved and the rest stay in the source.\\n\\nWhen a batch finishes, both panes reload. A failed entry does not stop the rest of the batch, and\\neach failure goes to the error log. Within a copied directory, though, the first failure stops the\\nrest of that directory, and what was copied before it stays. There is no progress display yet: a\\nlarge copy runs in the background and the panes update when it is done.\\\"\\\"\\\"),\\n(\\\"\\\"\\\"Twin never fails silently. A failure shows in red in the status bar for five seconds; when a\\ncopy or move had several failures, the toast names the first and counts the rest. Every error is kept in\\nthe error log (Alt+L) with the time it happened, up to the last 500, until Twin quits.\\\"\\\"\\\",\\n\\\"\\\"\\\"A failed operation shows in red in the status bar for five seconds; when a copy or move had\\nseveral failures, the toast names the first and counts the rest. Every error is kept in the error\\nlog (Alt+L) with the time it happened, up to the last 500, until Twin quits.\\\"\\\"\\\"),\\n(\\\"\\\"\\\"- Long names and paths are not shortened to fit the pane.\\\"\\\"\\\",\\n\\\"\\\"\\\"- Long names and paths are not shortened to fit the pane.\\n- An entry whose details cannot be read while listing a directory is left out of the listing,\\n  and no error is shown.\\\"\\\"\\\"),\\n]\\nfor a,b in subs:\\n    assert s.count(a)==1, a[:60]\\n    s=s.replace(a,b)\\nopen(p,'w').write(s)\\nEOF\\nsed -i 's|t.Cleanup(func() { os.RemoveAll(dst) })|t.Cleanup(func() { _ = os.RemoveAll(dst) })|' fs_test.go && grep -n '_ = os.RemoveAll(dst)' fs_test.go\",\"description\":\"Correct doc claims and explicit test cleanup\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "0373e672-2070-8e84-afa3-be9e95f3bd29",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

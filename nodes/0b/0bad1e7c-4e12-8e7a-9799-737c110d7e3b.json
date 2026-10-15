@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "0bad1e7c-4e12-8e7a-9799-737c110d7e3b",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422:agent-ab48af1d8c72685fa",
+    "parent_id": "7cb3f563-537f-81fe-83db-ff11d6bfd5cc",
+    "timestamp": "2026-10-15T09:14:00Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] function key.$\n$\n<!-- shortcuts: kept in sync with keys.go by docs_test.go --\n$\n| Key | F-key | Action |$\n| --- | --- | --- |$\n| `Alt+V` | `F3` | View the file under the cursor |$\n=== RUN   TestDocumentationListsEveryShortcut\n--- PASS: TestDocumentationListsEveryShortcut (0.00s)\nPASS\nok  \ttwin\t0.003s\n1",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mSVtjhVEUVkECNwFar"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 160,
+      "interaction_id": "0bad1e7c-4e12-8e7a-9799-737c110d7e3b",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"bash -c '\\nS=/tmp/claude-1000/-run-media-meirk-storage-2-projects-double-manager-twin2/4ad58f61-07aa-40fa-9123-1c46c8d92422/scratchpad/mut\\ncd \\\"$S\\\"\\ngrep -n \\\"shortcuts: kept\\\\|^<!--\\\" DOCUMENTATION.md | cat -A | cut -c1-120\\ngit -C /run/media/meirk/storage_2/projects/double_manager/twin2 show HEAD:DOCUMENTATION.md | grep -n \\\"<!--\\\" | head\\nls; cat go.work 2>/dev/null; go env GOWORK GOFLAGS\\n'\",\"description\":\"Inspect marker occurrences in scratch copy\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "0bad1e7c-4e12-8e7a-9799-737c110d7e3b",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

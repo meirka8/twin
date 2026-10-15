@@ -1,0 +1,26 @@
+{
+  "interaction": {
+    "id": "662e9b54-26cc-89a4-8c07-01f0bebb5109",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "a4c9993e-6c0f-8eb7-8428-771b309f1705",
+    "timestamp": "2026-10-15T09:23:07Z",
+    "author": "system",
+    "user_prompt": "[tool_result ToolSearch] [tool_reference]\n[tool_reference]",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3n9VcWbrGnZw3kd5tT4"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 185,
+      "interaction_id": "662e9b54-26cc-89a4-8c07-01f0bebb5109",
+      "tool_protocol": "mcp",
+      "tool_name": "mcp__ccd_pr__get_status",
+      "arguments": "{}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": []
+}

@@ -1,0 +1,26 @@
+{
+  "interaction": {
+    "id": "a4c9993e-6c0f-8eb7-8428-771b309f1705",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "99db4b01-dde2-8829-b873-92e2453c8f8e",
+    "timestamp": "2026-10-15T09:23:06Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] https://github.com/meirka8/twin/pull/42",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3n9MMvTAJSJTqQG6uLX"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 184,
+      "interaction_id": "a4c9993e-6c0f-8eb7-8428-771b309f1705",
+      "tool_protocol": "native",
+      "tool_name": "ToolSearch",
+      "arguments": "{\"max_results\":2,\"query\":\"select:mcp__ccd_pr__get_status,mcp__ccd_pr__bind_pr\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": []
+}

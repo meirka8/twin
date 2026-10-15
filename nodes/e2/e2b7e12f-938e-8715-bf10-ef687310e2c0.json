@@ -1,0 +1,43 @@
+{
+  "interaction": {
+    "id": "e2b7e12f-938e-8715-bf10-ef687310e2c0",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422:agent-ab48af1d8c72685fa",
+    "parent_id": "9b2e9467-8bef-878d-be0c-0cccb169ac3b",
+    "timestamp": "2026-10-15T09:14:51Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 50a51\n> \n\tfor _, line := range strings.Split(strings.TrimLeft(table, \"\\n\"), \"\\n\") {\n\t\tif !strings.HasPrefix(line, \"|\") {\n\t\t\tbreak // End of the table\n\t\t}\n\t\tcells := strings.Split(line, \"|\")\n\t\tif len(cells) < 4 {\n\t\t\tt.Fatalf(\"shortcut table row has fewer than three cells: %s\", line)\n\t\t}\n\t\tkey := strings.Trim(strings.TrimSpace(cells[1]), \"`\")\n\t\talias := strings.Trim(strings.TrimSpace(cells[2]), \"`\")\n\t\tif key == \"Key\" || strings.HasPrefix(key, \"-\") {\n\t\t\tcontinue // Header and separator\n\t\t}\n\t\tdocumented[key] = alias\n\t}\n\n\twant := make(map[string]string)\n\tfor _, s := range DefaultKeyMap().GetShortcuts() {\n\t\talias := \"\"\n\t\tif s.FKey != \"\" {\n\t\t\talias = keyLabel(s.FKey)\n\t\t}\n\t\twant[keyLabel(s.Key)] = alias\n\t}\n\n\tfor key, alias := range want {\n\t\tgot, ok := documented[key]\n\t\tswitch {\n\t\tcase !ok:\n\t\t\tt.Errorf(\"%s (keys.go) is missing from the shortcut table in DOCUMENTATION.md\", key)\n\t\tcase got != alias:\n\t\t\tt.Errorf(\"%s: DOCUMENTATION.md gives the F-key %q, keys.go %q\", key, got, alias)\n\t\t}\n\t}\n\tfor key := range documented {\n\t\tif _, ok := want[key]; !ok {\n\t\t\tt.Errorf(\"%s is in the shortcut table in DOCUMENTATION.md but not in keys.go\", key)\n\t\t}\n\t}\n}\n+golangci-lint run     # standard linters, configured in .golangci.yml\n+CI (`.github/workflows/ci.yml`) runs all of these on every push and must stay green: fix lint\n+findings rather than adding exclusions. It also sets `TWIN_XDEV_DIR` to a tmpfs so\n+`TestMoveAcrossRealDevices` runs a real cross-filesystem move, and fails if that test skips.\n+\n-how to test anything that goes through the modal flow.\n+how to test anything that goes through the modal flow. `docs_test.go` checks that the\n+shortcut table in DOCUMENTATION.md matches `keys.go`.\n-  raw string.\n+  raw string, and to the shortcut table in DOCUMENTATION.md.\n-A minimalistic two-pane TUI file manager in Go.\n+[![CI](https://github.com/meirka8/twin/actions/workflows/ci.yml/badge.svg)](https://github.com/meirka8/twin/actions/workflows/ci.yml)\n+\n+A minimalistic two-pane TUI file manager in Go. [DOCUMENTATION.md](DOCUMENTATION.md) describes the\n+keys and what every operation does; the [roadmap](Twin%20%E2%80%94%20Roadmap.md) says where Twin is\n+going.\n+\n+## Development\n+\n+```bash\n+go test ./...\n+go vet ./...\n+gofmt -l .\n+golangci-lint run\n+```\n+\n+CI runs all four on every push, and on pull requests from forks. `golangci-lint` uses the standard\n+linters, configured in `.golangci.yml`.\n+\n+The tests run a real move across filesystems only when `TWIN_XDEV_DIR` names a directory on\n+another filesystem than the temp directory. CI mounts a tmpfs for it; locally, `/dev/shm` usually\n+works:\n+\n+```bash\n+TWIN_XDEV_DIR=/dev/shm go test ./...\n+```\n-- [ ] CI: `go vet`, `gofmt`, `golangci-lint`, tests on every push.\n-- [ ] Rewrite DOCUMENTATION.md from `keys.go` (later: generate it).\n+- [x] CI: `go vet`, `gofmt`, `golangci-lint`, tests on every push. *(`.github/workflows/ci.yml`; tests run with `-race` and `TWIN_XDEV_DIR` on a tmpfs, so the real cross-device move runs too, and the job fails if it skips)*\n+- [x] Rewrite DOCUMENTATION.md from `keys.go` (later: generate it). *(until the actions registry generates it, `docs_test.go` fails when its shortcut table and `keys.go` disagree)*\n-4. On a branch: Bubble Tea v2 migration together with the modal stack, since both rewrite the top of `Update` anyway; then move mkdir and search input to v2 `bubbles/textinput` so non-ASCII names work (doing it after the migration avoids touching the inputs twice).\n+4. ✅ **Done** (branch `finish-phase0`). Close Phase 0: CI runs gofmt, go vet, golangci-lint (standard linters) and the tests on every push and on pull requests from forks; DOCUMENTATION.md is rewritten from `keys.go` and the code, with a test keeping its shortcut table in sync. Clearing the lint findings also made the clipboard fallback report a failed OSC 52 write instead of dropping it.\n+5. On a branch: Bubble Tea v2 migration together with the modal stack, since both rewrite the top of `Update` anyway; then move mkdir and search input to v2 `bubbles/textinput` so non-ASCII names work (doing it after the migration avoids touching the inputs twice).",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mWPojMUiDonXom9tbh"
+  },
+  "context_items": [
+    {
+      "id": 30,
+      "interaction_id": "e2b7e12f-938e-8715-bf10-ef687310e2c0",
+      "file_path": "DOCUMENTATION.md",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": 27,
+      "end_line": 221
+    }
+  ],
+  "tool_executions": [
+    {
+      "id": 166,
+      "interaction_id": "e2b7e12f-938e-8715-bf10-ef687310e2c0",
+      "tool_protocol": "native",
+      "tool_name": "Read",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/DOCUMENTATION.md\",\"limit\":195,\"offset\":27}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "e2b7e12f-938e-8715-bf10-ef687310e2c0",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

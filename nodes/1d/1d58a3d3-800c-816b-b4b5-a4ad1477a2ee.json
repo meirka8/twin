@@ -1,0 +1,43 @@
+{
+  "interaction": {
+    "id": "1d58a3d3-800c-816b-b4b5-a4ad1477a2ee",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "6d0d4886-7379-8d72-a6c9-ad4a8ab6f7f6",
+    "timestamp": "2026-10-15T09:02:20Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] package main\n\n// Shortcut represents a keyboard shortcut with a description.\ntype Shortcut struct {\n\tKey        string // The actual key to press (e.g., \"alt+c\", \"q\")\n\tDisplayKey string // The key to show in the UI (e.g., \"c\")\n\tFKey       string // Function key alias (e.g., \"f5\")\n\tModifier   string // \"ctrl\", \"alt\", \"shift\", or empty\n\tAction     string // Description for the UI\n\tCmd        string // Internal command identifier\n}\n\n// KeyMap holds all application shortcuts.\ntype KeyMap struct {\n\tQuit            Shortcut\n\tForceQuit       Shortcut\n\tSwitchPane      Shortcut\n\tPreview         Shortcut\n\tCopy            Shortcut\n\tMove            Shortcut\n\tNewFolder       Shortcut\n\tDelete          Shortcut\n\tCopyPath        Shortcut\n\tToggleSelection Shortcut\n\tFavorites       Shortcut\n\tAddToFavorites  Shortcut\n\tSyncPanes       Shortcut\n\tOpenInOther     Shortcut\n\tErrorLog        Shortcut\n}\n\n// DefaultKeyMap returns the default key mapping.\nfunc DefaultKeyMap() KeyMap {\n\treturn KeyMap{\n\t\tQuit:            Shortcut{Key: \"alt+q\", DisplayKey: \"q\", FKey: \"f10\", Modifier: \"alt\", Action: \"Quit\", Cmd: \"quit\"},\n\t\tForceQuit:       Shortcut{Key: \"ctrl+c\", DisplayKey: \"c\", Modifier: \"ctrl\", Action: \"Force Quit\", Cmd: \"force_quit\"},\n\t\tSwitchPane:      Shortcut{Key: \"tab\", DisplayKey: \"tab\", Modifier: \"\", Action: \"Switch Pane\", Cmd: \"switch_pane\"},\n\t\tPreview:         Shortcut{Key: \"alt+v\", DisplayKey: \"v\", FKey: \"f3\", Modifier: \"alt\", Action: \"View\", Cmd: \"preview\"},\n\t\tCopy:            Shortcut{Key: \"alt+c\", DisplayKey: \"c\", FKey: \"f5\", Modifier: \"alt\", Action: \"Copy\", Cmd: \"copy\"},\n\t\tMove:            Shortcut{Key: \"alt+m\", DisplayKey: \"m\", FKey: \"f6\", Modifier: \"alt\", Action: \"Move\", Cmd: \"move\"},\n\t\tNewFolder:       Shortcut{Key: \"alt+n\", DisplayKey: \"n\", FKey: \"f7\", Modifier: \"alt\", Action: \"MkDir\", Cmd: \"mkdir\"},\n\t\tDelete:          Shortcut{Key: \"alt+d\", DisplayKey: \"d\", FKey: \"f8\", Modifier: \"alt\", Action: \"Delete\", Cmd: \"delete\"},\n\t\tCopyPath:        Shortcut{Key: \"alt+p\", DisplayKey: \"p\", FKey: \"f9\", Modifier: \"alt\", Action: \"Copy Path\", Cmd: \"copy_path\"},\n\t\tFavorites:       Shortcut{Key: \"alt+f\", DisplayKey: \"f\", Modifier: \"alt\", Action: \"Favorites\", Cmd: \"favorites\"},\n\t\tAddToFavorites:  Shortcut{Key: \"alt+a\", DisplayKey: \"a\", Modifier: \"alt\", Action: \"Add Fav\", Cmd: \"add_favorite\"},\n\t\tToggleSelection: Shortcut{Key: \"insert\", DisplayKey: \"ins\", Modifier: \"\", Action: \"Select\", Cmd: \"select\"},\n\t\tSyncPanes:       Shortcut{Key: \"alt+i\", DisplayKey: \"i\", Modifier: \"alt\", Action: \"Sync Panes\", Cmd: \"sync_panes\"},\n\t\tOpenInOther:     Shortcut{Key: \"alt+o\", DisplayKey: \"o\", Modifier: \"alt\", Action: \"Open in Other\", Cmd: \"open_in_other\"},\n\t\tErrorLog:        Shortcut{Key: \"alt+l\", DisplayKey: \"l\", Modifier: \"alt\", Action: \"Log\", Cmd: \"error_log\"},\n\t}\n}\n\n// GetShortcuts returns a slice of all shortcuts for iteration.\nfunc (k KeyMap) GetShortcuts() []Shortcut {\n\treturn []Shortcut{\n\t\tk.Quit,\n\t\tk.ForceQuit,\n\t\tk.SwitchPane,\n\t\tk.Preview,\n\t\tk.Copy,\n\t\tk.Move,\n\t\tk.NewFolder,\n\t\tk.Delete,\n\t\tk.CopyPath,\n\t\tk.ToggleSelection,\n\t\tk.Favorites,\n\t\tk.AddToFavorites,\n\t\tk.SyncPanes,\n\t\tk.OpenInOther,\n\t\tk.ErrorLog,\n\t}\n}\n\n// GetAliasMap returns a map of aliases to their primary keys\nfunc (k KeyMap) GetAliasMap() map[string]string {\n\taliases := make(map[string]string)\n\tfor _, s := range k.GetShortcuts() {\n\t\tif s.FKey != \"\" {\n\t\t\taliases[s.FKey] = s.Key\n\t\t}\n\t}\n\treturn aliases\n}\n-----\n# Twin Manager\n\nA minimalistic two-pane TUI file manager in Go.\n\n## Running the Application\n\nSince the code is split into multiple files, you need to run the package, not just `main.go`.\n\n```bash\ngo run .\n```\n\nOr build it first:\n\n```bash\ngo build .\n./twin\n```\n-----\npackage main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\n\ttea \"github.com/charmbracelet/bubbletea\"\n)\n\nfunc main() {\n\t// Enable Kitty Keyboard Protocol\n\tfmt.Print(\"\\x1b[>15u\")\n\tdefer fmt.Print(\"\\x1b[<u\")\n\n\tp := tea.NewProgram(initialModel(), tea.WithAltScreen(), tea.WithInput(os.Stdin))\n\tif _, err := p.Run(); err != nil {\n\t\tfmt.Printf(\"Alas, there's been an error: %v\", err)\n\t\tos.Exit(1)\n\t}\n}",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3kZWtqcE5UsZQ4j54hf"
+  },
+  "context_items": [
+    {
+      "id": 9,
+      "interaction_id": "1d58a3d3-800c-816b-b4b5-a4ad1477a2ee",
+      "file_path": "update.go",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": null,
+      "end_line": null
+    }
+  ],
+  "tool_executions": [
+    {
+      "id": 102,
+      "interaction_id": "1d58a3d3-800c-816b-b4b5-a4ad1477a2ee",
+      "tool_protocol": "native",
+      "tool_name": "Read",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/update.go\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "1d58a3d3-800c-816b-b4b5-a4ad1477a2ee",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

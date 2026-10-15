@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "30d182a9-4f84-8e5e-b0e3-5d794e708bf3",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "72027d9f-57c1-8078-aaf7-ea4e045f7e64",
+    "timestamp": "2026-10-15T09:17:57Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 47:Every shortcut has an Alt binding; the classic ones also answer to the Midnight Commander\n48:function key.\n130:**Moving** renames within a filesystem. Across filesystems (to a USB drive, for example) Twin\n132:is untouched and the partial copy is removed.\n134:When a batch finishes, both panes reload. A failed entry does not stop the others; each failure\n135:goes to the error log. There is no progress display yet: a large copy runs in the background and\n194:Twin never fails silently. A failure shows in red in the status bar for five seconds; when a\n195:copy or move had several failures, the toast names the first and counts the rest. Every error is kept in\n220:- Long names and paths are not shortened to fit the pane.\n\t\tt.Fatal(err)\n\t}\n\tt.Cleanup(func() { os.RemoveAll(dst) })\n\tvar srcStat, dstStat unix.Stat_t\n\tif unix.Stat(src, &srcStat) != nil || unix.Stat(dst, &dstStat) != nil || srcStat.Dev == dstStat.Dev {",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mkZeDJYytR11eTJjWg"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 172,
+      "interaction_id": "30d182a9-4f84-8e5e-b0e3-5d794e708bf3",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"sed -n 128,137p DOCUMENTATION.md && sed -n 192,198p DOCUMENTATION.md\",\"description\":\"Show the move and errors paragraphs\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "30d182a9-4f84-8e5e-b0e3-5d794e708bf3",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

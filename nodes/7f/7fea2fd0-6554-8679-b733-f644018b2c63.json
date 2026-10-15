@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "7fea2fd0-6554-8679-b733-f644018b2c63",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422:agent-ab48af1d8c72685fa",
+    "parent_id": "a85cb412-b1de-8dc3-92ce-d6a9bbe81fd9",
+    "timestamp": "2026-10-15T09:11:08Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] === RUN   TestDocumentationListsEveryShortcut\n--- PASS: TestDocumentationListsEveryShortcut (0.00s)\n=== RUN   TestReadDirectoryMarksParent\n--- PASS: TestReadDirectoryMarksParent (0.00s)\n=== RUN   TestOperationTargetsNeverIncludeParent\n--- PASS: TestOperationTargetsNeverIncludeParent (0.00s)\n=== RUN   TestPlanBatch\n--- PASS: TestPlanBatch (0.00s)\n=== RUN   TestPlanBatchRejectsSameDirectory\n--- PASS: TestPlanBatchRejectsSameDirectory (0.00s)\n=== RUN   TestPlanBatchRejectsDirectoryIntoItself\n--- PASS: TestPlanBatchRejectsDirectoryIntoItself (0.00s)\n=== RUN   TestTransferFilesRefusesUnsafeTargets\n--- PASS: TestTransferFilesRefusesUnsafeTargets (0.00s)\n=== RUN   TestTransferFilesKeepsGoingAfterError\n--- PASS: TestTransferFilesKeepsGoingAfterError (0.00s)\n=== RUN   TestReadDirectoryResolvesSymlinks\n--- PASS: TestReadDirectoryResolvesSymlinks (0.00s)\n=== RUN   TestReadDirectoryErrorKeepsParent\n--- PASS: TestReadDirectoryErrorKeepsParent (0.00s)\n=== RUN   TestCopySymlinksAsLinks\n--- PASS: TestCopySymlinksAsLinks (0.00s)\n=== RUN   TestTransferRefusesOverwritingSourceUnderAnotherName\n--- PASS: TestTransferRefusesOverwritingSourceUnderAnotherName (0.00s)\n=== RUN   TestCopyPreservesModeAndModTime\n--- PASS: TestCopyPreservesModeAndModTime (0.00s)\n=== RUN   TestCopyOverwriteLeavesNoTemporaryFiles\n--- PASS: TestCopyOverwriteLeavesNoTemporaryFiles (0.00s)\n=== RUN   TestCopyRefusesSpecialFiles\n--- PASS: TestCopyRefusesSpecialFiles (0.00s)\n=== RUN   TestMoveMergesIntoExistingDirectory\n=== RUN   TestMoveMergesIntoExistingDirectory/crossDevice=false\n=== RUN   TestMoveMergesIntoExistingDirectory/crossDevice=true\n--- PASS: TestMoveMergesIntoExistingDirectory (0.00s)\n    --- PASS: TestMoveMergesIntoExistingDirectory/crossDevice=false (0.00s)\n    --- PASS: TestMoveMergesIntoExistingDirectory/crossDevice=true (0.00s)\n=== RUN   TestMoveAcrossDevices\n--- PASS: TestMoveAcrossDevices (0.00s)\n=== RUN   TestFailedMoveAcrossDevicesKeepsSource\n--- PASS: TestFailedMoveAcrossDevicesKeepsSource (0.00s)\n=== RUN   TestMoveAcrossRealDevices\n    fs_test.go:443: TWIN_XDEV_DIR not set\n--- SKIP: TestMoveAcrossRealDevices (0.00s)\n=== RUN   TestMoveAcrossDevicesOntoSymlinkDoesNotWriteThroughIt\n--- PASS: TestMoveAcrossDevicesOntoSymlinkDoesNotWriteThroughIt (0.00s)\n=== RUN   TestMoveAcrossDevicesWithReadOnlyDirectories\n--- PASS: TestMoveAcrossDevicesWithReadOnlyDirectories (0.00s)\n=== RUN   TestCopyLongFileName\n--- PASS: TestCopyLongFileName (0.00s)\n=== RUN   TestDeleteOnParentEntryDoesNothing\n--- PASS: TestDeleteOnParentEntryDoesNothing (0.00s)\n=== RUN   TestInsertDoesNotSelectParent\n--- PASS: TestInsertDoesNotSelectParent (0.00s)\n=== RUN   TestCopyWithinSameDirectoryKeepsContent\n--- PASS: TestCopyWithinSameDirectoryKeepsContent (0.00s)\n=== RUN   TestConflictsAreDecidedPerFile\n--- PASS: TestConflictsAreDecidedPerFile (0.00s)\n=== RUN   TestMoveSkipAllStillMovesCleanFiles\n--- PASS: TestMoveSkipAllStillMovesCleanFiles (0.00s)\n=== RUN   TestEscCancelsWholeBatch\n--- PASS: TestEscCancelsWholeBatch (0.00s)\n=== RUN   TestEnteringUnreadableDirectoryKeepsPaneWhereItWas\n--- PASS: TestEnteringUnreadableDirectoryKeepsPaneWhereItWas (0.00s)\n=== RUN   TestFailedReloadStillOffersParent\n--- PASS: TestFailedReloadStillOffersParent (0.00s)\n=== RUN   TestErrorsAreLoggedAndShownUntilExpired\n--- PASS: TestErrorsAreLoggedAndShownUntilExpired (0.00s)\n=== RUN   TestErrorLogOwnsKeysWhileOpen\n--- PASS: TestErrorLogOwnsKeysWhileOpen (0.00s)\n=== RUN   TestSymlinkedDirectory\n--- PASS: TestSymlinkedDirectory (0.00s)\n=== RUN   TestFavoritesOwnKeysWhileOpen\n--- PASS: TestFavoritesOwnKeysWhileOpen (0.00s)\nPASS\nok  \ttwin\t1.027s",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mEPh63BGDvbZQeQTKF"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 152,
+      "interaction_id": "7fea2fd0-6554-8679-b733-f644018b2c63",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"sed -n 425,480p fs_test.go && df -T /tmp /dev/shm \\\"$TMPDIR\\\" 2>/dev/null; echo TMPDIR=$TMPDIR\",\"description\":\"Show the real cross-device test and filesystems\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "7fea2fd0-6554-8679-b733-f644018b2c63",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

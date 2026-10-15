@@ -1,0 +1,60 @@
+{
+  "interaction": {
+    "id": "2791a38c-22ea-8608-807e-e4ee4b1f0759",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422:agent-ab48af1d8c72685fa",
+    "parent_id": "7fea2fd0-6554-8679-b733-f644018b2c63",
+    "timestamp": "2026-10-15T09:11:16Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] \tif err := os.Chmod(filepath.Join(src, \"dir\", \"secret\"), 0); err != nil {\n\t\tt.Fatal(err)\n\t}\n\n\tif err := transferFiles([]file{fileNamed(t, src, \"dir\")}, dst, true); err == nil {\n\t\tt.Fatal(\"expected the unreadable file to fail the move\")\n\t}\n\tif got := readFile(t, filepath.Join(src, \"dir\", \"a\")); got != \"data\" {\n\t\tt.Errorf(\"source changed: %q\", got)\n\t}\n\tassertGone(t, filepath.Join(dst, \"dir\")) // No partial copy left behind\n}\n\n// TestMoveAcrossRealDevices moves into $TWIN_XDEV_DIR, which must be on another\n// filesystem than the system temp directory (e.g. a tmpfs mount in CI).\nfunc TestMoveAcrossRealDevices(t *testing.T) {\n\troot := os.Getenv(\"TWIN_XDEV_DIR\")\n\tif root == \"\" {\n\t\tt.Skip(\"TWIN_XDEV_DIR not set\")\n\t}\n\tsrc := t.TempDir()\n\tdst, err := os.MkdirTemp(root, \"twin-test-\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tt.Cleanup(func() { os.RemoveAll(dst) })\n\tvar srcStat, dstStat unix.Stat_t\n\tif unix.Stat(src, &srcStat) != nil || unix.Stat(dst, &dstStat) != nil || srcStat.Dev == dstStat.Dev {\n\t\tt.Skip(\"TWIN_XDEV_DIR is on the same filesystem as the temp directory\")\n\t}\n\tmkdirs(t, src, \"dir\")\n\twriteFiles(t, filepath.Join(src, \"dir\"), \"data\", \"f\")\n\n\tif err := transferFiles([]file{fileNamed(t, src, \"dir\")}, dst, true); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif got := readFile(t, filepath.Join(dst, \"dir\", \"f\")); got != \"data\" {\n\t\tt.Errorf(\"got %q\", got)\n\t}\n\tassertGone(t, filepath.Join(src, \"dir\"))\n}\n\nfunc TestMoveAcrossDevicesOntoSymlinkDoesNotWriteThroughIt(t *testing.T) {\n\tsimulateCrossDevice(t)\n\tsrc, dst, other := t.TempDir(), t.TempDir(), t.TempDir()\n\tmkdirs(t, src, \"proj\")\n\twriteFiles(t, filepath.Join(src, \"proj\"), \"new\", \"f\")\n\twriteFiles(t, other, \"precious\", \"f\")\n\tif err := os.Symlink(other, filepath.Join(dst, \"proj\")); err != nil {\n\t\tt.Fatal(err)\n\t}\n\n\tif err := transferFiles([]file{fileNamed(t, src, \"proj\")}, dst, true); err == nil {\n\t\tt.Fatal(\"expected the move onto a symlink to fail\")\n\t}\n\tif got := readFile(t, filepath.Join(other, \"f\")); got != \"precious\" {\nFilesystem     Type   Size  Used Avail Use% Mounted on\ntmpfs          tmpfs   32G  330M   32G   2% /tmp\ntmpfs          tmpfs   32G 1010M   31G   4% /dev/shm\nTMPDIR=",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mEeGw8k686hz4Faa4v"
+  },
+  "context_items": [
+    {
+      "id": 28,
+      "interaction_id": "2791a38c-22ea-8608-807e-e4ee4b1f0759",
+      "file_path": "fs.go",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": null,
+      "end_line": null
+    },
+    {
+      "id": 29,
+      "interaction_id": "2791a38c-22ea-8608-807e-e4ee4b1f0759",
+      "file_path": "DOCUMENTATION.md",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": null,
+      "end_line": null
+    }
+  ],
+  "tool_executions": [
+    {
+      "id": 153,
+      "interaction_id": "2791a38c-22ea-8608-807e-e4ee4b1f0759",
+      "tool_protocol": "native",
+      "tool_name": "Read",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/fs.go\"}",
+      "status": "success"
+    },
+    {
+      "id": 154,
+      "interaction_id": "2791a38c-22ea-8608-807e-e4ee4b1f0759",
+      "tool_protocol": "native",
+      "tool_name": "Read",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/DOCUMENTATION.md\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "2791a38c-22ea-8608-807e-e4ee4b1f0759",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

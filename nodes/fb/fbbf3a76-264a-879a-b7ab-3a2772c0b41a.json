@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "fbbf3a76-264a-879a-b7ab-3a2772c0b41a",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "9073e639-cd5e-8b95-a75c-418ef5f47dbf",
+    "timestamp": "2026-10-15T09:09:02Z",
+    "author": "system",
+    "user_prompt": "[tool_result Write] The file /run/media/meirk/storage_2/projects/double_manager/twin2/DOCUMENTATION.md has been updated successfully. (file state is current in your context — no need to Read it back)",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": "Fixing a few statements that were less precise than the code (left/right arrows don't clear search, delete clears the selection only on confirm, preview ignores directories):",
+    "source_request_id": "req_011Cg3m3YPAgQ6cEuhmMKt52"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 127,
+      "interaction_id": "fbbf3a76-264a-879a-b7ab-3a2772c0b41a",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"python3 - <<'EOF'\\np='DOCUMENTATION.md'\\ns=open(p).read()\\nsubs=[\\n(\\\"\\\"\\\"Every shortcut has an Alt binding; the classic ones also answer to the Midnight Commander\\nfunction key. The alias works wherever the Alt key does.\\\"\\\"\\\",\\n\\\"\\\"\\\"Every shortcut has an Alt binding; the classic ones also answer to the Midnight Commander\\nfunction key.\\\"\\\"\\\"),\\n(\\\"| `Alt+Q` | `F10` | Quit |\\\", \\\"| `Alt+Q` | `F10` | Quit, without asking |\\\"),\\n(\\\"\\\\nTwin quits at once, without asking.\\\\n\\\", \\\"\\\"),\\n(\\\"\\\"\\\"characters in order (`cmg` finds `commands.go`). Esc, the arrow keys, PgUp/PgDn and Enter clear\\nthe query.\\\"\\\"\\\",\\n\\\"\\\"\\\"characters in order (`cmg` finds `commands.go`). Esc, ↑/↓, PgUp/PgDn and Enter clear the\\nquery.\\\"\\\"\\\"),\\n(\\\"\\\"\\\"and is never copied, moved or deleted. Copy, Move and Delete clear the selection.\\\"\\\"\\\",\\n\\\"\\\"\\\"and is never copied, moved or deleted. Starting a copy or move, or confirming a delete, clears\\nthe selection.\\\"\\\"\\\"),\\n(\\\"\\\"\\\"- **Refused entries** are reported as errors while the rest of the batch goes ahead: `..`, an\\n  entry copied onto itself (both panes in the same directory, or the same file reached through a\\n  hard link or symlink), and a directory copied into itself or one of its subdirectories.\\\"\\\"\\\",\\n\\\"\\\"\\\"- **Refused entries** are reported as errors while the rest of the batch goes ahead: `..`, an\\n  entry copied or moved onto itself (both panes in the same directory, or the same file reached\\n  through a hard link or symlink), and a directory copied or moved into itself or one of its\\n  subdirectories.\\\"\\\"\\\"),\\n(\\\"\\\"\\\"visible. Long lines wrap. Only text is shown\\\"\\\"\\\",\\n\\\"\\\"\\\"visible; on a directory it does nothing. Long lines wrap. Only text is shown\\\"\\\"\\\"),\\n(\\\"\\\"\\\"Alt+A adds the directory under the cursor to the favorites, or the active pane's own directory\\nwhen the cursor is on a file or on `..`.\\\"\\\"\\\",\\n\\\"\\\"\\\"Alt+A adds the directory under the cursor to the favorites, or the active pane's own directory\\nwhen the cursor is on a file or on `..`; a directory already in the list is not added again.\\\"\\\"\\\"),\\n(\\\"\\\"\\\"Twin never fails silently. A failure shows in red in the status bar for five seconds; when a\\nbatch had several failures, the toast names the first and counts the rest.\\\"\\\"\\\",\\n\\\"\\\"\\\"Twin never fails silently. A failure shows in red in the status bar for five seconds; when a\\ncopy or move had several failures, the toast names the first and counts the rest.\\\"\\\"\\\"),\\n(\\\"[roadmap](Twin%20—%20Roadmap.md)\\\", \\\"[roadmap](Twin%20%E2%80%94%20Roadmap.md)\\\"),\\n(\\\"\\\"\\\"- Favorites, like everything else, are not saved between sessions, and there is no config file.\\\"\\\"\\\",\\n\\\"\\\"\\\"- Nothing is saved between sessions, favorites included, and there is no config file.\\\"\\\"\\\"),\\n]\\nfor a,b in subs:\\n    assert s.count(a)==1, a[:60]\\n    s=s.replace(a,b)\\nopen(p,'w').write(s)\\nEOF\\necho ok\",\"description\":\"Apply accuracy fixes to documentation\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "fbbf3a76-264a-879a-b7ab-3a2772c0b41a",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

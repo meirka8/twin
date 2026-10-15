@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "98de5ec9-b1f5-86d6-8fa5-ab52589a8842",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "c5113eb4-e054-827b-a4d0-900f78a85d67",
+    "timestamp": "2026-10-15T09:18:55Z",
+    "author": "system",
+    "user_prompt": "[tool_result mcp__ccd_session__spawn_task] Noted (position 1, task_id: task_4c1fab32). A chip is showing for the user — they can start it in a fresh worktree with one click, or dismiss it. If this suggestion becomes stale or superseded, call dismiss_task with this task_id. Currently pending: task_4c1fab32 \"Report per-entry stat failures in directory listings\". Continue your current work.",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mpv6e5tHsGhr17HHHc"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 181,
+      "interaction_id": "98de5ec9-b1f5-86d6-8fa5-ab52589a8842",
+      "tool_protocol": "native",
+      "tool_name": "ScheduleWakeup",
+      "arguments": "{\"stop\":true}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "98de5ec9-b1f5-86d6-8fa5-ab52589a8842",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

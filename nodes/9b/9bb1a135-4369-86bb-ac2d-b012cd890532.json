@@ -1,0 +1,43 @@
+{
+  "interaction": {
+    "id": "9bb1a135-4369-86bb-ac2d-b012cd890532",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "a5ca4782-6b1c-8de9-ae96-cf4fc6951817",
+    "timestamp": "2026-10-15T09:09:48Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] PUBLIC\n{\"allowed_actions\":\"all\",\"enabled\":true,\"sha_pinning_required\":false}",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3m8JPvhcm2ESEJydsjE"
+  },
+  "context_items": [
+    {
+      "id": 18,
+      "interaction_id": "9bb1a135-4369-86bb-ac2d-b012cd890532",
+      "file_path": "README.md",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": null,
+      "end_line": null
+    }
+  ],
+  "tool_executions": [
+    {
+      "id": 132,
+      "interaction_id": "9bb1a135-4369-86bb-ac2d-b012cd890532",
+      "tool_protocol": "native",
+      "tool_name": "Write",
+      "arguments": "{\"content\":\"# Twin Manager\\n\\n[![CI](https://github.com/meirka8/twin/actions/workflows/ci.yml/badge.svg)](https://github.com/meirka8/twin/actions/workflows/ci.yml)\\n\\nA minimalistic two-pane TUI file manager in Go. [DOCUMENTATION.md](DOCUMENTATION.md) describes the\\nkeys and what every operation does; the [roadmap](Twin%20%E2%80%94%20Roadmap.md) says where Twin is\\ngoing.\\n\\n## Running the Application\\n\\nSince the code is split into multiple files, you need to run the package, not just `main.go`.\\n\\n```bash\\ngo run .\\n```\\n\\nOr build it first:\\n\\n```bash\\ngo build .\\n./twin\\n```\\n\\n## Development\\n\\n```bash\\ngo test ./...\\ngo vet ./...\\ngofmt -l .\\ngolangci-lint run\\n```\\n\\nCI runs all four on every push, and on pull requests from forks. `golangci-lint` uses the standard\\nlinters, configured in `.golangci.yml`.\\n\\nThe tests run a real move across filesystems only when `TWIN_XDEV_DIR` names a directory on\\nanother filesystem than the temp directory. CI mounts a tmpfs for it; locally, `/dev/shm` usually\\nworks:\\n\\n```bash\\nTWIN_XDEV_DIR=/dev/shm go test ./...\\n```\\n\",\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/README.md\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "9bb1a135-4369-86bb-ac2d-b012cd890532",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

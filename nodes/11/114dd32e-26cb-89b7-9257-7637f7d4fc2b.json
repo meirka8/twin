@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "114dd32e-26cb-89b7-9257-7637f7d4fc2b",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "f8753bfe-1615-829d-b242-ada008df8336",
+    "timestamp": "2026-10-15T09:04:12Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] go: downloading github.com/dlclark/regexp2/v2 v2.2.1\ngo: downloading github.com/mattn/go-runewidth v0.0.24\ngo: downloading github.com/charmbracelet/x/termios v0.1.1\ngo: downloading github.com/charmbracelet/x/windows v0.2.2\ngo: downloading github.com/dlclark/regexp2 v1.12.0\ngolangci-lint",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3khfLpEbvWE11oVeBhU"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 108,
+      "interaction_id": "114dd32e-26cb-89b7-9257-7637f7d4fc2b",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"L=/tmp/claude-1000/-run-media-meirk-storage-2-projects-double-manager-twin2/4ad58f61-07aa-40fa-9123-1c46c8d92422/scratchpad/bin/golangci-lint; $L version; $L run ./... 2>&1 | tail -40; echo; gofmt -l .; go vet ./... && echo vet-ok; staticcheck ./... && echo sc-ok\",\"description\":\"Run golangci-lint, gofmt, vet, staticcheck\",\"timeout\":300000}",
+      "status": "failure"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "114dd32e-26cb-89b7-9257-7637f7d4fc2b",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

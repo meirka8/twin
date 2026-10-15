@@ -1,0 +1,51 @@
+{
+  "interaction": {
+    "id": "09d9856f-5c3c-8586-be1f-a4f2595e88bb",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "9bb1a135-4369-86bb-ac2d-b012cd890532",
+    "timestamp": "2026-10-15T09:09:52Z",
+    "author": "system",
+    "user_prompt": "[tool_result Write] The file /run/media/meirk/storage_2/projects/double_manager/twin2/README.md has been updated successfully. (file state is current in your context — no need to Read it back)",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3m8hawi6FE1AhZFPHEr"
+  },
+  "context_items": [
+    {
+      "id": 19,
+      "interaction_id": "09d9856f-5c3c-8586-be1f-a4f2595e88bb",
+      "file_path": "CLAUDE.md",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": null,
+      "end_line": null
+    }
+  ],
+  "tool_executions": [
+    {
+      "id": 133,
+      "interaction_id": "09d9856f-5c3c-8586-be1f-a4f2595e88bb",
+      "tool_protocol": "native",
+      "tool_name": "Edit",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/CLAUDE.md\",\"new_string\":\"go vet ./...          # static checks\\ngofmt -l .            # check formatting\\ngolangci-lint run     # standard linters, configured in .golangci.yml\\ngo test ./...         # run the tests\\n```\\n\\nCI (`.github/workflows/ci.yml`) runs all of these on every push and must stay green: fix lint\\nfindings rather than adding exclusions. It also sets `TWIN_XDEV_DIR` to a tmpfs so\\n`TestMoveAcrossRealDevices` runs a real cross-filesystem move, and fails if that test skips.\\n\\n`fs_test.go` covers the filesystem helpers with `t.TempDir()`. `update_test.go` drives\\n`Update` with key messages and runs the returned commands (see its `send` helper), which is\\nhow to test anything that goes through the modal flow. `docs_test.go` checks that the\\nshortcut table in DOCUMENTATION.md matches `keys.go`.\",\"old_string\":\"go vet ./...          # static checks\\ngofmt -l .            # check formatting\\ngo test ./...         # run the tests\\n```\\n\\n`fs_test.go` covers the filesystem helpers with `t.TempDir()`. `update_test.go` drives\\n`Update` with key messages and runs the returned commands (see its `send` helper), which is\\nhow to test anything that goes through the modal flow.\",\"replace_all\":false}",
+      "status": "success"
+    },
+    {
+      "id": 134,
+      "interaction_id": "09d9856f-5c3c-8586-be1f-a4f2595e88bb",
+      "tool_protocol": "native",
+      "tool_name": "Edit",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/CLAUDE.md\",\"new_string\":\"  so a new shortcut must be added to `KeyMap` (and `GetShortcuts()`) rather than matched as a\\n  raw string, and to the shortcut table in DOCUMENTATION.md.\",\"old_string\":\"  so a new shortcut must be added to `KeyMap` (and `GetShortcuts()`) rather than matched as a\\n  raw string.\",\"replace_all\":false}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "09d9856f-5c3c-8586-be1f-a4f2595e88bb",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

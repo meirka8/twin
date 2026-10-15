@@ -1,0 +1,68 @@
+{
+  "interaction": {
+    "id": "461f93ff-0024-88f5-8d95-6cbfe0292a01",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "879e9a2e-7539-8578-b5a4-bc1882adc474",
+    "timestamp": "2026-10-15T09:05:16Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash error] Exit code 1\npackage main\n\nimport (\n\t\"strings\"\n\n\t\"github.com/charmbracelet/lipgloss\"\n)\n\n// calculateWrappedLines wraps the content to fit the given width and returns the lines.\nfunc calculateWrappedLines(content string, width int) []string {\n\tif width <= 0 {\n\t\treturn []string{}\n\t}\n\twrappedContent := lipgloss.NewStyle().Width(width).Render(content)\n\treturn strings.Split(wrappedContent, \"\\n\")\n}\n\n// fuzzyMatch checks if the query characters appear in the target string in order.\nfunc fuzzyMatch(query, target string) bool {\n\tif query == \"\" {\n\t\treturn true\n\t}\n\n\tqueryRunes := []rune(strings.ToLower(query))\n\ttargetRunes := []rune(strings.ToLower(target))\n\n\tqIdx := 0\n\tfor _, t := range targetRunes {\n\t\tif qIdx < len(queryRunes) && t == queryRunes[qIdx] {\n\t\t\tqIdx++\n\t\t}\n\t}\n\treturn qIdx == len(queryRunes)\n}\npackage main\n\nimport \"github.com/charmbracelet/lipgloss\"\n\nvar (\n\t// Styles\n\tdocStyle             = lipgloss.NewStyle().Margin(1, 2)\n\tactiveStyle          = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).BorderForeground(lipgloss.Color(\"63\"))\n\tinactiveStyle        = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).BorderForeground(lipgloss.Color(\"240\"))\n\tcursorStyle          = lipgloss.NewStyle().Background(lipgloss.Color(\"63\")).Foreground(lipgloss.Color(\"255\"))\n\tselectionStyle       = lipgloss.NewStyle().Background(lipgloss.Color(\"220\")).Foreground(lipgloss.Color(\"0\"))\n\tdirStyle             = lipgloss.NewStyle().Foreground(lipgloss.Color(\"33\"))\n\tfileStyle            = lipgloss.NewStyle().Foreground(lipgloss.Color(\"255\"))\n\tstatusBar            = lipgloss.NewStyle().Background(lipgloss.Color(\"235\")).Foreground(lipgloss.Color(\"250\")).Padding(0, 1)\n\tstatusBarActive      = lipgloss.NewStyle().Background(lipgloss.Color(\"63\")).Foreground(lipgloss.Color(\"255\")).Padding(0, 1)\n\tinputPromptStyle     = lipgloss.NewStyle().Background(lipgloss.Color(\"235\")).Foreground(lipgloss.Color(\"255\")).Padding(0, 1)\n\tconfirmPromptStyle   = lipgloss.NewStyle().Background(lipgloss.Color(\"166\")).Foreground(lipgloss.Color(\"255\")).Padding(0, 1)\n\toverwritePromptStyle = lipgloss.NewStyle().Background(lipgloss.Color(\"202\")).Foreground(lipgloss.Color(\"0\")).Padding(0, 1)\n\tpreviewStyle         = lipgloss.NewStyle().Border(lipgloss.DoubleBorder(), true).BorderForeground(lipgloss.Color(\"205\")).Padding(1, 2)\n\terrorToastStyle      = lipgloss.NewStyle().Background(lipgloss.Color(\"160\")).Foreground(lipgloss.Color(\"255\")).Bold(true).Padding(0, 1)\n\tlogStyle             = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).BorderForeground(lipgloss.Color(\"160\")).Padding(0, 1)\n\tlogTitleStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color(\"160\")).Bold(true)\n\n\t// Hint Styles\n\tmodifierStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color(\"240\")).Padding(0, 1)\n\tmodifierActiveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(\"0\")).Background(lipgloss.Color(\"63\")).Bold(true).Padding(0, 1) // Chips are rectangular in terminal usually\n\n\t// Chip styles\n\taltChipStyle = lipgloss.NewStyle().\n\t\t\tForeground(lipgloss.Color(\"0\")).\n\t\t\tBackground(lipgloss.Color(\"63\")). // Blue-ish background for active state\n\t\t\tBold(true).\n\t\t\tPadding(0, 1).\n\t\t\tMarginRight(1)\n\n\taltChipInactiveStyle = lipgloss.NewStyle().\n\t\t\t\tForeground(lipgloss.Color(\"250\")).\n\t\t\t\tBackground(lipgloss.Color(\"235\")).\n\t\t\t\tPadding(0, 1).\n\t\t\t\tMarginRight(1)\n\n\thintKeyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(\"63\")).Bold(true).Background(lipgloss.Color(\"235\")).Padding(0, 1)\n\thintDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(\"250\")).Background(lipgloss.Color(\"233\")).Padding(0, 1)\n\thintCardStyle = lipgloss.NewStyle().\n\t\t// Border(lipgloss.RoundedBorder()).\n\t\tBorderForeground(lipgloss.Color(\"238\")).\n\t\tPadding(1, 1).\n\t\tMarginRight(1)\n\n\t// Popup Styles\n\tpopupStyle = lipgloss.NewStyle().\n\t\t\tBorder(lipgloss.RoundedBorder()).\n\t\t\tBorderForeground(lipgloss.Color(\"63\")).\n\t\t\tPadding(1, 2).\n\t\t\tBackground(lipgloss.Color(\"235\")) // Dark background to cover underlying text\n\n\tpopupConfirmStyle = lipgloss.NewStyle().\n\t\t\t\tBorder(lipgloss.RoundedBorder()).\n\t\t\t\tBorderForeground(lipgloss.Color(\"196\")). // Red for remove confirmation\n\t\t\t\tPadding(1, 2).\n\t\t\t\tBackground(lipgloss.Color(\"235\"))\n)\n(eval):1: no matches found: --include=*.go",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3kn5sKBicUMgf7zcowr"
+  },
+  "context_items": [
+    {
+      "id": 10,
+      "interaction_id": "461f93ff-0024-88f5-8d95-6cbfe0292a01",
+      "file_path": "update.go",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": null,
+      "end_line": null
+    },
+    {
+      "id": 11,
+      "interaction_id": "461f93ff-0024-88f5-8d95-6cbfe0292a01",
+      "file_path": "utils.go",
+      "git_blob_sha": null,
+      "dirty_patch": null,
+      "start_line": null,
+      "end_line": null
+    }
+  ],
+  "tool_executions": [
+    {
+      "id": 111,
+      "interaction_id": "461f93ff-0024-88f5-8d95-6cbfe0292a01",
+      "tool_protocol": "native",
+      "tool_name": "Edit",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/update.go\",\"new_string\":\"\\tcase directoryLoadedMsg:\\n\\t\\tswitch msg.paneID {\\n\\t\\tcase m.leftPane.id:\\n\\t\\t\\tm.leftPane.applyListing(msg)\\n\\t\\tcase m.rightPane.id:\\n\\t\\t\\tm.rightPane.applyListing(msg)\\n\\t\\t}\",\"old_string\":\"\\tcase directoryLoadedMsg:\\n\\t\\tif msg.paneID == m.leftPane.id {\\n\\t\\t\\tm.leftPane.applyListing(msg)\\n\\t\\t} else if msg.paneID == m.rightPane.id {\\n\\t\\t\\tm.rightPane.applyListing(msg)\\n\\t\\t}\",\"replace_all\":false}",
+      "status": "success"
+    },
+    {
+      "id": 112,
+      "interaction_id": "461f93ff-0024-88f5-8d95-6cbfe0292a01",
+      "tool_protocol": "native",
+      "tool_name": "Edit",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/update.go\",\"new_string\":\"\\tcase tea.WindowSizeMsg:\\n\\t\\t// Below the panes: the status bar (1 line) and the hint bar (3: text and padding).\\n\\t\\t// The pane borders (2) are added around the height when rendering.\\n\\t\\tpaneHeight := msg.Height - 1 - 3 - 2\\n\\t\\tpaneWidth := msg.Width/2 - 2\",\"old_string\":\"\\tcase tea.WindowSizeMsg:\\n\\t\\t// Handle window resizing\\n\\t\\t// Height includes:\\n\\t\\t// - Status bar (1 line)\\n\\t\\t// - Hint panel (approx 3 lines: 1 text + 2 border)\\n\\t\\t// - Borders (2 lines for top/bottom of pane?)\\n\\t\\t// Let's account for 4 lines of overhead separate from pane borders.\\n\\t\\tpaneHeight := msg.Height - 1 - 4 // Adjust for status bar (1) and hints (3) and maybe some breathing room?\\n\\t\\t// Previously it was -1 -2. 1 for status, 2 for borders?\\n\\t\\t// If we have top border and bottom border on panes, that's inside paneView rendering usually or accounted for here.\\n\\t\\t// Let's try reducing height by 5 total to be safe: 1 (status) + 3 (hints).\\n\\t\\t// Wait, original was `msg.Height - 1 - 2`.\\n\\t\\t// If hints are new, we need to subtract their height.\\n\\t\\t// Hint panel height = 3 (1 text + 2 border).\\n\\t\\t// So we need to subtract 3 more than before.\\n\\t\\t// New calculation: msg.Height - 1 (status) - 3 (hints) - 2 (pane borders overhead if any, previously 2)\\n\\t\\t// Total subtraction: 6.\\n\\t\\tpaneHeight = msg.Height - 6\\n\\t\\tpaneWidth := msg.Width/2 - 2\",\"replace_all\":false}",
+      "status": "success"
+    },
+    {
+      "id": 113,
+      "interaction_id": "461f93ff-0024-88f5-8d95-6cbfe0292a01",
+      "tool_protocol": "native",
+      "tool_name": "Edit",
+      "arguments": "{\"file_path\":\"/run/media/meirk/storage_2/projects/double_manager/twin2/utils.go\",\"new_string\":\"\\tqueryRunes := []rune(strings.ToLower(query))\\n\\n\\tqIdx := 0\\n\\tfor _, t := range strings.ToLower(target) {\",\"old_string\":\"\\tqueryRunes := []rune(strings.ToLower(query))\\n\\ttargetRunes := []rune(strings.ToLower(target))\\n\\n\\tqIdx := 0\\n\\tfor _, t := range targetRunes {\",\"replace_all\":false}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "461f93ff-0024-88f5-8d95-6cbfe0292a01",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

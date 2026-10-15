@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "e4a0f7e0-23a6-8c4b-9228-b10696bfc119",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422:agent-ab48af1d8c72685fa",
+    "parent_id": "661b2854-fc56-832a-b132-309bc5c3f941",
+    "timestamp": "2026-10-15T09:16:09Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] 54:| `Alt+C` | `F4` | Copy (stale row) |\n55:| `Alt+C` | `F5` | Copy to the other pane |\nok  \ttwin\t0.004s",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": null,
+    "source_request_id": "req_011Cg3mcY7xXQhRAwNC3rCF5"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 169,
+      "interaction_id": "e4a0f7e0-23a6-8c4b-9228-b10696bfc119",
+      "tool_protocol": "native",
+      "tool_name": "Bash",
+      "arguments": "{\"command\":\"date +%T && echo \\\"== gofmt\\\" && gofmt -l . ; echo \\\"exit $status\\\"; echo \\\"== vet\\\" && go vet ./... ; echo \\\"exit $status\\\"; echo \\\"== golangci\\\" && /tmp/claude-1000/-run-media-meirk-storage-2-projects-double-manager-twin2/4ad58f61-07aa-40fa-9123-1c46c8d92422/scratchpad/bin/golangci-lint run ./... ; echo \\\"exit $status\\\"; echo \\\"== test\\\"; env TWIN_XDEV_DIR=/dev/shm go test -race -count=1 -v ./... > /tmp/claude-1000/-run-media-meirk-storage-2-projects-double-manager-twin2/4ad58f61-07aa-40fa-9123-1c46c8d92422/scratchpad/test.log 2>&1; echo \\\"exit $status\\\"; grep -c '^--- PASS' /tmp/claude-1000/-run-media-meirk-storage-2-projects-double-manager-twin2/4ad58f61-07aa-40fa-9123-1c46c8d92422/scratchpad/test.log; grep -E '^--- (FAIL|SKIP)|^ok|^FAIL' /tmp/claude-1000/-run-media-meirk-storage-2-projects-double-manager-twin2/4ad58f61-07aa-40fa-9123-1c46c8d92422/scratchpad/test.log; ls -l --time-style=+%T *.go DOCUMENTATION.md .github/workflows/ci.yml .golangci.yml | awk '{print $6, $7}'\",\"description\":\"Re-run all checks on the current tree\",\"timeout\":500000}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "e4a0f7e0-23a6-8c4b-9228-b10696bfc119",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}

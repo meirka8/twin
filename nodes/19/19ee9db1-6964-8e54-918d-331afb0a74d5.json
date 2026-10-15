@@ -1,0 +1,33 @@
+{
+  "interaction": {
+    "id": "19ee9db1-6964-8e54-918d-331afb0a74d5",
+    "conversation_id": "4ad58f61-07aa-40fa-9123-1c46c8d92422",
+    "parent_id": "dc3cd337-8efa-8a47-ad7d-3c12d1bede02",
+    "timestamp": "2026-10-15T09:10:45Z",
+    "author": "system",
+    "user_prompt": "[tool_result Bash] ok  \ttwin\t0.010s",
+    "model_name": "claude-opus-5-5",
+    "model_cot": null,
+    "model_response": "Tests and gofmt are clean. I'm waiting on the reviewer before committing.",
+    "source_request_id": "req_011Cg3mCNU7dMmQ8VCMbrSa4"
+  },
+  "context_items": [],
+  "tool_executions": [
+    {
+      "id": 143,
+      "interaction_id": "19ee9db1-6964-8e54-918d-331afb0a74d5",
+      "tool_protocol": "native",
+      "tool_name": "ScheduleWakeup",
+      "arguments": "{\"delaySeconds\":1200,\"noop\":true,\"prompt\":\"Check whether the go-reviewer agent finished reviewing the finish-phase0 branch; if so, address findings, commit, push and open the PR.\",\"reason\":\"Fallback in case the go-reviewer agent's completion notification never arrives\"}",
+      "status": "success"
+    }
+  ],
+  "artifact_links": [
+    {
+      "interaction_id": "19ee9db1-6964-8e54-918d-331afb0a74d5",
+      "git_commit_hash": "991f22ad757079935285c077fce28369f23b37e4",
+      "link_type": "generated",
+      "linked_by": "meir.kanevskiy@gmail.com"
+    }
+  ]
+}
