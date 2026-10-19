@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 Twin Manager: a minimalistic two-pane TUI file manager written in Go, built with
-[Bubble Tea](https://github.com/charmbracelet/bubbletea) (MVU framework) and
-[Lipgloss](https://github.com/charmbracelet/lipgloss) (styling). Linux-focused (drive
-detection reads `/proc/mounts`, unmounting shells out to `umount`).
+[Bubble Tea v2](https://github.com/charmbracelet/bubbletea) (MVU framework),
+[Lipgloss v2](https://github.com/charmbracelet/lipgloss) (styling) and `textinput` from
+[Bubbles v2](https://github.com/charmbracelet/bubbles), imported as `charm.land/.../v2`.
+Linux-focused (drive detection reads `/proc/mounts`, unmounting shells out to `umount`).
 
 ## Commands
 
@@ -37,17 +38,29 @@ shortcut table in DOCUMENTATION.md matches `keys.go`.
 The app follows Bubble Tea's Model-View-Update (MVU) pattern, split across files by
 responsibility rather than by feature:
 
-- `model.go` — the `model` struct (whole app state) and `pane` struct (one of the two
-  directory panes: path, files, cursor, viewport, selection, search query). `initialModel()`
-  builds the starting state; `Init()` kicks off the initial directory loads for both panes.
-- `update.go` — all `Update()` logic. This is the core control flow file. The top of `Update`
-  is a chain of mutually-exclusive modal states checked in order — `isCreatingFolder`,
-  `isDeleting`, `isConfirmingOverwrite`, `isFavoritesOpen` (with nested `isConfirmingUnmount`
-  / `isConfirmingRemoveFav` sub-states), `isLogOpen`, `isPreviewing` — each intercepting key input for its
-  own modal UI before falling through to normal two-pane navigation. Below that chain is a
-  second switch that handles async result messages (`directoryLoadedMsg`, `fileOperationMsg`,
-  etc.) that apply regardless of mode. Pane-local navigation (cursor movement, active search,
-  entering directories) lives in the `pane.update()` method at the bottom of the file.
+- `model.go` — the `model` struct (whole app state, including the modal stack `modals`) and
+  `pane` struct (one of the two directory panes: path, files, cursor, viewport, selection,
+  quick-search `textinput`). `newPane` and `initialModel()` build the starting state; `Init()`
+  kicks off the initial directory loads for both panes. `activePane()` / `inactivePane()`
+  return pointers to the panes.
+- `update.go` — `Update()`, the core control flow. It first switches on async result messages
+  (`directoryLoadedMsg`, `fileOperationMsg`, `transferPlannedMsg`, etc.), which apply whatever
+  modal is open. Every other message (keys, pastes) goes to the modal on top of the stack if
+  there is one, otherwise to `shortcut()` (the `KeyMap` actions) and then to the active pane.
+  Pane-local navigation (cursor movement, quick search, entering directories) lives in
+  `pane.update()` at the bottom of the file.
+- `modal.go` — the `modal` interface and the stack (`openModal`, `setModal`,
+  `updateTopModal`). Modals are values: `update(m *model, msg)` returns the modal's new state,
+  or nil to close it, and may open another modal over itself with `m.openModal`. A modal
+  renders either `statusView` (a line in the status bar) or `paneView` (a box in place of the
+  active pane). The panes show the topmost modal with a pane view, so a confirm over the
+  favorites leaves the list visible; the status bar shows only the top modal's line. A modal
+  that arrives from a command result rather than a key (the conflict modal, on
+  `transferPlannedMsg`) goes to the bottom of the stack, so keys typed into a dialog that was
+  opened in the meantime never answer it. One file per dialog: `modal_confirm.go` and `modal_input.go` (generic y/n
+  question and text prompt, each taking a callback), `modal_conflict.go` (per-file overwrite
+  questions; it runs the copy/move batch), `modal_favorites.go`, `modal_log.go`,
+  `modal_preview.go`.
 - `commands.go` — `tea.Cmd` constructors that perform actual I/O (filesystem ops, `xdg-open`,
   `umount`, clipboard) inside a returned closure and report results via a message type. Follow
   this pattern for new I/O: never mutate model state directly from a command closure — return
@@ -60,15 +73,17 @@ responsibility rather than by feature:
   + XDG-style user dirs for the favorites list).
 - `keys.go` — `KeyMap`/`Shortcut`: every action has a canonical `alt+<letter>` binding plus an
   optional F-key alias. `GetAliasMap()` maps F-key aliases back to their canonical key string;
-  `Update` resolves incoming key events through this map before switching on `m.keyMap.X.Key`,
+  `shortcut()` resolves incoming key events through this map before switching on `m.keyMap.X.Key`,
   so a new shortcut must be added to `KeyMap` (and `GetShortcuts()`) rather than matched as a
   raw string, and to the shortcut table in DOCUMENTATION.md.
-- `view.go` — `View()` and the render helpers for the two panes, status bar, hints bar, and the
-  full-screen preview/favorites overlays. Overlays replace one or both panes rather than
-  layering on top.
+- `view.go` — `View()` (a `tea.View`: alt screen and keyboard enhancements are declared there)
+  and the render helpers for the two panes, status bar and hints bar. A modal's pane view is
+  cut to the pane's box, so it never shifts the other pane. Lip Gloss v2 counts borders and
+  padding in `Width`/`Height`: `pane.width`/`height` are the content size inside the border,
+  `pane.boxSize()` the size on screen.
 - `styles.go` — all `lipgloss.Style` definitions used by `view.go`.
-- `utils.go` — small pure helpers (`fuzzyMatch` for active search, `calculateWrappedLines` for
-  preview text wrapping).
+- `utils.go` — small pure helpers (`fuzzyMatch` for quick search, `calculateWrappedLines` for
+  preview text wrapping, `clampIndex`, `oneLinePaste`).
 
 ### Key conventions
 
@@ -92,9 +107,14 @@ responsibility rather than by feature:
 - Directory reloads pass an optional `focusPath` so the cursor can be restored to a specific
   entry after the reload (e.g. focus the newly created folder, or the parent's own path when
   navigating up via `..`).
-- Modal UI state (creating folder, deleting, confirming overwrite, favorites panel, preview) is
-  mutually exclusive; when adding a new modal, add a branch to the mode chain at the top of
-  `Update` and make sure it returns before falling through to normal pane key handling.
+- Dialogs are modals on the stack, never flags on the model. A yes/no question or a text prompt
+  is `newConfirmModal` / `newInputModal` with a callback; anything else is a new type
+  implementing `modal` in its own `modal_*.go` file, opened with `m.openModal`. Results that
+  arrive for a modal later (like `previewReadyMsg`) are matched to it in `Update`'s result
+  switch, so a stale one is ignored.
+- Keys are `tea.KeyPressMsg`. Match `msg.String()` against `KeyMap` keys; a key that types
+  something has `msg.Text` set (any script; `String()` then returns the text, and `"space"`
+  for a space). Text fields are `bubbles/textinput`; pastes arrive as `tea.PasteMsg`.
 
 ## CVC (Continuity/Version Context) MCP
 

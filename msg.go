@@ -33,12 +33,9 @@ type transferPlannedMsg struct {
 }
 
 type previewReadyMsg struct {
-	Content string
-	Err     error
-}
-
-type clipboardCopiedMsg struct {
-	err error
+	path    string // File read, so that a preview closed in the meantime ignores it
+	content string
+	err     error
 }
 
 type driveUnmountedMsg struct {

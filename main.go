@@ -4,17 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func main() {
-	// Enable Kitty Keyboard Protocol
-	fmt.Print("\x1b[>15u")
-	defer fmt.Print("\x1b[<u")
-
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen(), tea.WithInput(os.Stdin))
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Alas, there's been an error: %v", err)
+	if _, err := tea.NewProgram(initialModel()).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "twin: %v\n", err)
 		os.Exit(1)
 	}
 }
