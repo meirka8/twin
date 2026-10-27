@@ -10,9 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
-	"github.com/aymanbagabas/go-osc52/v2"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Commands
@@ -83,21 +82,21 @@ func previewFileCmd(path string) tea.Cmd {
 	return func() tea.Msg {
 		content, err := os.ReadFile(path)
 		if err != nil {
-			return previewReadyMsg{Err: fmt.Errorf("could not read file: %w", err)}
+			return previewReadyMsg{path: path, err: fmt.Errorf("could not read file: %w", err)}
 		}
 
 		// Basic check for binary content
 		if !utf8.Valid(content) || bytes.Contains(content, []byte{0}) {
-			return previewReadyMsg{Content: fmt.Sprintf("--- Binary file: %s ---", filepath.Base(path))}
+			return previewReadyMsg{path: path, content: fmt.Sprintf("--- Binary file: %s ---", filepath.Base(path))}
 		}
 
 		// Limit preview size
 		const maxPreviewSize = 1024 * 100 // 100KB
 		if len(content) > maxPreviewSize {
-			return previewReadyMsg{Content: fmt.Sprintf("--- File too large for preview (%s), showing first %d bytes ---\n%s", filepath.Base(path), maxPreviewSize, content[:maxPreviewSize])}
+			return previewReadyMsg{path: path, content: fmt.Sprintf("--- File too large for preview (%s), showing first %d bytes ---\n%s", filepath.Base(path), maxPreviewSize, content[:maxPreviewSize])}
 		}
 
-		return previewReadyMsg{Content: string(content)}
+		return previewReadyMsg{path: path, content: string(content)}
 	}
 }
 
@@ -116,15 +115,11 @@ func unmountDriveCmd(path string) tea.Cmd {
 
 func copyToClipboardCmd(text string) tea.Cmd {
 	return func() tea.Msg {
-		err := clipboard.WriteAll(text)
-		if err != nil {
-			// Fall back to OSC 52. Whether the terminal honours it cannot be known, so
-			// only a failure to write the sequence at all is reported.
-			if _, oscErr := osc52.New(text).WriteTo(os.Stderr); oscErr != nil {
-				// One line: reportError logs every line of an error as an entry of its own.
-				return clipboardCopiedMsg{err: fmt.Errorf("copy to clipboard: %v; OSC 52 fallback: %w", err, oscErr)}
-			}
+		if err := clipboard.WriteAll(text); err != nil {
+			// No clipboard tool (wl-copy, xclip, xsel): ask the terminal to set the clipboard
+			// with OSC 52. Whether it does cannot be known, so there is nothing to report.
+			return tea.SetClipboard(text)()
 		}
-		return clipboardCopiedMsg{}
+		return nil
 	}
 }

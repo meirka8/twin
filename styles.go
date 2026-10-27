@@ -1,6 +1,9 @@
 package main
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/lipgloss/v2"
+)
 
 var (
 	// Styles
@@ -18,6 +21,19 @@ var (
 	errorToastStyle      = lipgloss.NewStyle().Background(lipgloss.Color("160")).Foreground(lipgloss.Color("255")).Bold(true).Padding(0, 1)
 	logStyle             = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).BorderForeground(lipgloss.Color("160")).Padding(0, 1)
 	logTitleStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Bold(true)
+	separatorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	// statusInputStyles styles a text field on inputPromptStyle. Each part carries the
+	// prompt's colours: it ends with a reset that would otherwise clear the prompt's own.
+	statusInputStyles = func() textinput.Styles {
+		text := lipgloss.NewStyle().Foreground(inputPromptStyle.GetForeground()).Background(inputPromptStyle.GetBackground())
+		s := textinput.DefaultDarkStyles()
+		s.Focused.Text, s.Focused.Prompt = text, text
+		s.Blurred = s.Focused
+		s.Cursor.Color = inputPromptStyle.GetForeground()
+		s.Cursor.Blink = false // A blinking cursor needs its timer messages routed to the field
+		return s
+	}()
 
 	// Chip styles
 	altChipStyle = lipgloss.NewStyle().
@@ -47,10 +63,4 @@ var (
 			BorderForeground(lipgloss.Color("63")).
 			Padding(1, 2).
 			Background(lipgloss.Color("235")) // Dark background to cover underlying text
-
-	popupConfirmStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("196")). // Red for remove confirmation
-				Padding(1, 2).
-				Background(lipgloss.Color("235"))
 )

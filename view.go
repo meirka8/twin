@@ -2,156 +2,80 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
 // View renders the application UI.
-func (m model) View() string {
+func (m model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	// With the Kitty keyboard protocol, Ctrl and Alt shortcuts also report the key's letter
+	// on a US layout, so they work while typing in another script (Hebrew, Russian, ...).
+	v.KeyboardEnhancements.ReportAlternateKeys = true
+	return v
+}
+
+// render lays out the panes, the status bar and the hint bar.
+func (m model) render() string {
 	if m.quitting {
 		return "Exiting Twin Manager. Goodbye!\n"
 	}
-
-	if m.isPreviewing {
-		var finalView string
-		// Calculate inner dimensions for content
-		// Border (2) + Padding (4) = 6 horizontal overhead
-		// Border (2) + Padding (2) = 4 vertical overhead
-		innerWidth := m.previewWidth - 6
-		innerHeight := m.previewHeight - 4
-
-		// Wrap content to fit width first
-		wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
-
-		// Truncate to fit height with scrolling
-		contentLines := wrappedLines
-		maxScroll := len(contentLines) - innerHeight
-		if maxScroll < 0 {
-			maxScroll = 0
-		}
-
-		if m.previewScrollY > maxScroll {
-			m.previewScrollY = maxScroll
-		}
-		if m.previewScrollY < 0 {
-			m.previewScrollY = 0
-		}
-
-		start := m.previewScrollY
-		end := start + innerHeight
-		if end > len(contentLines) {
-			end = len(contentLines)
-		}
-
-		visibleLines := contentLines[start:end]
-
-		previewView := previewStyle.Width(m.previewWidth).Height(m.previewHeight).Render(strings.Join(visibleLines, "\n"))
-		if m.leftPane.active {
-			finalView = lipgloss.JoinHorizontal(lipgloss.Top, previewView, paneView(m.rightPane))
-		} else {
-			finalView = lipgloss.JoinHorizontal(lipgloss.Top, paneView(m.leftPane), previewView)
-		}
-		return lipgloss.JoinVertical(lipgloss.Left, finalView, m.statusBarView())
-	}
-
-	if m.isLogOpen {
-		var finalView string
-		if m.leftPane.active {
-			finalView = lipgloss.JoinHorizontal(lipgloss.Top, m.logView(), paneView(m.rightPane))
-		} else {
-			finalView = lipgloss.JoinHorizontal(lipgloss.Top, paneView(m.leftPane), m.logView())
-		}
-		return lipgloss.JoinVertical(lipgloss.Left, finalView, m.statusBarView(), m.hintsView())
-	}
-
-	if m.isFavoritesOpen {
-		var centerContent string
-		if m.isConfirmingRemoveFav {
-			centerContent = m.favoritesConfirmView()
-		} else if m.isConfirmingUnmount {
-			centerContent = m.favoritesUnmountConfirmView()
-		} else {
-			centerContent = m.favoritesView()
-		}
-
-		var finalView string
-		if m.leftPane.active {
-			finalView = lipgloss.JoinHorizontal(lipgloss.Top, centerContent, paneView(m.rightPane))
-		} else {
-			finalView = lipgloss.JoinHorizontal(lipgloss.Top, paneView(m.leftPane), centerContent)
-		}
-		return lipgloss.JoinVertical(lipgloss.Left,
-			finalView,
-			m.statusBarView(),
-			m.hintsView(),
-		)
-	}
-
-	leftView := paneView(m.leftPane)
-	rightView := paneView(m.rightPane)
-
-	return lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView),
-		m.statusBarView(),
-		m.hintsView(),
-	)
+	return lipgloss.JoinVertical(lipgloss.Left, m.panesView(), m.statusBarView(), m.hintsView())
 }
 
+// panesView renders the two panes side by side. The topmost modal with a pane view takes
+// the active pane's place, cut to the pane's box so that it never pushes the other pane
+// aside.
+func (m model) panesView() string {
+	left, right := paneView(m.leftPane), paneView(m.rightPane)
+	width, height := m.activePane().boxSize()
+	for _, md := range slices.Backward(m.modals) {
+		if s := md.paneView(&m, width, height); s != "" {
+			s = lipgloss.NewStyle().MaxWidth(width).MaxHeight(height).Render(s)
+			if m.leftPane.active {
+				left = s
+			} else {
+				right = s
+			}
+			break
+		}
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+}
+
+// statusBarView shows the line of the modal on top, if it has one: a question from a modal
+// lower down is not shown, since its keys would not reach it.
 func (m model) statusBarView() string {
-	if m.isCreatingFolder {
-		return inputPromptStyle.Render("Create folder: " + m.folderNameInput)
-	}
-
-	if m.isDeleting {
-		if len(m.filesToDelete) == 1 {
-			return confirmPromptStyle.Render(fmt.Sprintf("Delete %s? (y/n)", m.filesToDelete[0].Name))
-		}
-		return confirmPromptStyle.Render(fmt.Sprintf("Delete %d items? (y/n)", len(m.filesToDelete)))
-	}
-
-	if m.isConfirmingOverwrite {
-		if len(m.overwriteConflicts) > 0 {
-			return overwritePromptStyle.Render(fmt.Sprintf("Overwrite %s? (y/n/A/s)", m.overwriteConflicts[0].Source.Name))
+	if n := len(m.modals); n > 0 {
+		if s := m.modals[n-1].statusView(&m); s != "" {
+			return s
 		}
 	}
 
+	screenWidth := m.leftPane.width + m.rightPane.width + 4 // Both panes with their borders
 	if m.toast != "" {
-		width := max(m.leftPane.width+m.rightPane.width+2, 0) // Screen width minus padding
+		width := max(screenWidth-errorToastStyle.GetHorizontalFrameSize(), 0)
 		return errorToastStyle.Render(ansi.Truncate("! "+m.toast, width, "…"))
 	}
 
-	activePane := m.leftPane
-	if m.rightPane.active {
-		activePane = m.rightPane
-	}
-
+	activePane := m.activePane()
 	var search string
-	if activePane.searchQuery != "" {
-		search = "Search: " + activePane.searchQuery
+	if q := activePane.search.Value(); q != "" {
+		search = statusBarActive.Render("Search: " + q)
 	}
 
-	if len(activePane.files) == 0 || activePane.cursor >= len(activePane.files) {
-		return statusBar.Render(search)
+	f, ok := activePane.cursorFile()
+	if !ok {
+		return search
 	}
-
-	f := activePane.files[activePane.cursor]
 	status := fmt.Sprintf("%s | %s | %s", f.Name, f.Mode.String(), f.ModTime.Format("2006-01-02 15:04:05"))
-
-	// Calculate available space for the status, leaving room for the search query
-	w := lipgloss.Width
-	statusWidth := w(status)
-	searchWidth := w(search)
-	availableWidth := m.leftPane.width + m.rightPane.width + 2 - searchWidth
-	if availableWidth < statusWidth {
-		status = status[:availableWidth]
-	}
-
-	return lipgloss.JoinHorizontal(lipgloss.Left,
-		statusBarActive.Render(search),
-		statusBar.Render(status),
-	)
+	width := max(screenWidth-lipgloss.Width(search)-statusBar.GetHorizontalFrameSize(), 0)
+	return search + statusBar.Render(ansi.Truncate(status, width, "…"))
 }
 
 func paneView(p pane) string {
@@ -186,7 +110,8 @@ func paneView(p pane) string {
 		style = activeStyle
 	}
 
-	return style.Width(p.width).Height(p.height).Render(s.String())
+	width, height := p.boxSize()
+	return style.Width(width).Height(height).Render(s.String())
 }
 
 func (m model) hintsView() string {
@@ -231,119 +156,4 @@ func (m model) hintsView() string {
 		// No spacer needed if margins are handled by styles
 		lipgloss.JoinHorizontal(lipgloss.Left, hints...),
 	)
-}
-
-func (m model) favoritesView() string {
-	var s strings.Builder
-	s.WriteString("Favorites\n\n")
-
-	renderItem := func(i int, name string, isSelected bool) {
-		cursor := "  "
-		if isSelected {
-			cursor = "> "
-		}
-		line := cursor + name
-		if isSelected {
-			s.WriteString(selectionStyle.Render(line))
-		} else {
-			s.WriteString(line)
-		}
-		s.WriteString("\n")
-	}
-
-	for i, fav := range m.favorites {
-		renderItem(i, fav, i == m.favoritesCursor)
-	}
-
-	if len(m.drives) > 0 {
-		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("──────────────────────"))
-		s.WriteString("\n")
-		for i, drive := range m.drives {
-			// Offset cursor logic for drives
-			globalIndex := len(m.favorites) + i
-			renderItem(globalIndex, drive, globalIndex == m.favoritesCursor)
-		}
-	}
-
-	deleteHint := "[Delete/d] Remove"
-	if m.favoritesCursor >= len(m.favorites) {
-		deleteHint = "[d] Unmount"
-	}
-	s.WriteString("\n[Enter] Go  [Esc] Close  " + deleteHint)
-
-	content := popupStyle.Render(s.String())
-
-	activePane := m.leftPane
-	if m.rightPane.active {
-		activePane = m.rightPane
-	}
-
-	return lipgloss.Place(activePane.width, activePane.height, lipgloss.Center, lipgloss.Center, content)
-}
-
-func (m model) favoritesConfirmView() string {
-	fav := ""
-	if m.favToRemove >= 0 && m.favToRemove < len(m.favorites) {
-		fav = m.favorites[m.favToRemove]
-	}
-
-	var s strings.Builder
-	fmt.Fprintf(&s, "Remove '%s' from favorites?\n\n", fav)
-	s.WriteString("[y] Yes  [n] No")
-
-	content := popupConfirmStyle.Render(s.String())
-
-	activePane := m.leftPane
-	if m.rightPane.active {
-		activePane = m.rightPane
-	}
-
-	return lipgloss.Place(activePane.width, activePane.height, lipgloss.Center, lipgloss.Center, content)
-}
-
-func (m model) favoritesUnmountConfirmView() string {
-	var s strings.Builder
-	fmt.Fprintf(&s, "Unmount '%s'?\n\n", m.driveToUnmount)
-	s.WriteString("[y] Yes  [n] No")
-
-	content := popupConfirmStyle.Render(s.String())
-
-	activePane := m.leftPane
-	if m.rightPane.active {
-		activePane = m.rightPane
-	}
-
-	return lipgloss.Place(activePane.width, activePane.height, lipgloss.Center, lipgloss.Center, content)
-}
-
-// logLines is the error log wrapped to the width of the log overlay, oldest first.
-func (m model) logLines() []string {
-	var lines []string
-	for _, e := range m.errLog {
-		lines = append(lines, calculateWrappedLines(e.time.Format("15:04:05 ")+e.text, m.leftPane.width-2)...)
-	}
-	return lines
-}
-
-// logView renders the error log in place of the active pane, newest entries at the bottom.
-func (m model) logView() string {
-	p := m.leftPane
-	if m.rightPane.active {
-		p = m.rightPane
-	}
-
-	lines := m.logLines()
-	end := len(lines) - min(m.logScrollY, m.maxLogScroll())
-	rows := append([]string{}, lines[max(end-m.logRows(), 0):end]...)
-	if len(lines) == 0 {
-		rows = []string{"No errors so far."}
-	}
-	for len(rows) < m.logRows() {
-		rows = append(rows, "")
-	}
-
-	title := logTitleStyle.Render(fmt.Sprintf("Error log (%d)", len(m.errLog)))
-	hint := "[↑/↓/PgUp/PgDn] Scroll  [Esc] Close"
-	content := lipgloss.JoinVertical(lipgloss.Left, title, strings.Join(rows, "\n"), hint)
-	return logStyle.Width(p.width).Height(p.height).Render(content)
 }

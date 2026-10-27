@@ -36,8 +36,8 @@ Both panes start in the current directory, with the left pane active.
 - **Active pane.** The active pane has a blue border, the other a grey one. Copy and move always
   go from the active pane into the other pane's directory.
 - **Status bar.** Shows the name, permissions and modification time of the entry under the
-  cursor, the quick-search query, the questions Twin asks (overwrite? delete?) and, in red, the
-  latest error.
+  cursor, the quick-search query, the questions Twin asks (overwrite? delete? unmount?) and, in
+  red, the latest error.
 - **Hint bar.** Lists the Alt shortcuts.
 
 ## Keys
@@ -45,7 +45,9 @@ Both panes start in the current directory, with the left pane active.
 ### Shortcuts
 
 Most shortcuts are Alt+letter; the classic ones also answer to the Midnight Commander function
-key.
+key. In a terminal with the Kitty keyboard protocol (Kitty, Ghostty and foot, for example) the
+Alt and Ctrl shortcuts also work while the keyboard is in another layout, such as Hebrew or
+Russian; in other terminals they need a Latin layout.
 
 <!-- shortcuts: kept in sync with keys.go by docs_test.go -->
 | Key | F-key | Action |
@@ -74,16 +76,17 @@ key.
 | `PgUp` `PgDn` | Move the cursor by a pane's height |
 | `Home` `End` | First or last entry |
 | `Enter` | Enter a directory, or open a file with `xdg-open`. On `..`, go up with the cursor on the directory you came from |
-| any letter, digit or symbol | Quick search |
+| any letter, digit or symbol, in any script | Quick search |
 | `Esc` | Clear the quick search |
 
 ### Quick search
 
 Typing in a pane jumps to a match; there is nothing to open first. Each character extends the
-query, which is shown in the status bar. The cursor jumps to the first entry whose name starts
-with the query, ignoring case; if there is none, to the first entry that contains the query's
-characters in order (`cmg` finds `commands.go`). Esc, ↑/↓, PgUp/PgDn and Enter clear the
-query. Backspace does not edit it: press Esc and type again.
+query, which is shown in the status bar; letters of any script count, and a paste adds to the
+query as if typed. The cursor jumps to the first entry whose name starts with the query,
+ignoring case; if there is none, to the first entry that contains the query's characters in
+order (`cmg` finds `commands.go`). Backspace deletes the last character of the query. Esc,
+↑/↓, PgUp/PgDn and Enter clear the query.
 
 ## Working with files
 
@@ -114,7 +117,9 @@ whole batch without touching anything:
   | `s` | Skip this one and every remaining conflict |
   | `Esc` | Cancel the whole batch: nothing is copied or moved, not even the entries without a conflict |
 
-  Nothing is written until every conflict is answered; then the whole batch runs at once.
+  Nothing is written until every conflict is answered; then the whole batch runs at once. If
+  another dialog was opened while Twin was still checking the batch, the questions wait until
+  it closes, so keys typed into it never answer them.
 
 Overwriting a directory merges into it: files inside it with the same names are overwritten
 without further questions, and files that exist only at the destination stay.
@@ -147,7 +152,10 @@ with everything in them. A symbolic link is removed itself, never what it points
 ### New folder
 
 Alt+N (F7) asks for a name in the status bar. Enter creates the folder in the active pane's
-directory and puts the cursor on it; Esc cancels; Backspace deletes the last character.
+directory and puts the cursor on it; Enter with no name, or Esc, cancels. The name can be in any
+script, and can be pasted with the terminal's paste (Ctrl+Shift+V in most terminals): a line
+break at the end of the paste is dropped, any other becomes a space. The usual editing keys work: ←/→, Home/End, Backspace/Delete, Ctrl+W (delete a word)
+and Ctrl+U (delete to the start).
 
 ### Copy Path
 
@@ -179,7 +187,7 @@ drives mounted under `/media`, `/mnt` and `/run/media`.
 | --- | --- |
 | `↑` `↓` or `k` `j`, `Home` `End` | Move |
 | `Enter` | Open in the active pane |
-| `d` or `Delete` | On a favorite: remove it from the list. On a drive: unmount it with `umount`. Both ask `y`/`n` first |
+| `d` or `Delete` | On a favorite: remove it from the list. On a drive: unmount it with `umount`. Both ask `y`/`n` in the status bar first, with the list still showing; `n` or Esc returns to the list |
 | `Esc`, `q` or `Alt+F` | Close |
 
 Alt+A adds the directory under the cursor to the favorites, or the active pane's own directory
@@ -214,8 +222,6 @@ reports why.
 
 These are tracked in the [roadmap](Twin%20%E2%80%94%20Roadmap.md).
 
-- The new-folder prompt and quick search accept ASCII only: Hebrew, Russian and other non-ASCII
-  letters are dropped, and paste is ignored.
 - Delete is permanent; there is no trash and no undo.
 - Copy and move show no progress and cannot be cancelled.
 - Nothing is saved between sessions, favorites included, and there is no config file.
@@ -226,26 +232,36 @@ These are tracked in the [roadmap](Twin%20%E2%80%94%20Roadmap.md).
 
 ## Under the hood
 
-Twin is written in Go with [Bubble Tea](https://github.com/charmbracelet/bubbletea), an Elm-style
-Model-View-Update framework, and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for
-styling. The whole state is one `model`; `Update` turns key presses and results into a new model;
-`View` renders it. Anything that touches the disk runs in a command off the UI thread and reports
-back with a message, so the interface does not freeze.
+Twin is written in Go with [Bubble Tea v2](https://github.com/charmbracelet/bubbletea), an
+Elm-style Model-View-Update framework, [Lip Gloss v2](https://github.com/charmbracelet/lipgloss)
+for styling and the text field from [Bubbles v2](https://github.com/charmbracelet/bubbles). The
+whole state is one `model`; `Update` turns key presses and results into a new model; `View`
+renders it. Anything that touches the disk runs in a command off the UI thread and reports back
+with a message, so the interface does not freeze.
+
+Dialogs are modals on a stack: the one on top gets every key press and paste until it closes,
+so nothing reaches the panes or the dialog below it. A modal draws either a line in the status
+bar or a panel in place of the active pane, so a question asked from the favorites list leaves
+the list showing.
 
 | File | Contents |
 | --- | --- |
 | `model.go` | The `model` and `pane` state, and the initial state |
-| `update.go` | `Update`: the dialogs, the shortcuts, results of commands, and pane navigation |
+| `update.go` | `Update`: results of commands, the shortcuts, pane navigation and quick search |
+| `modal.go` | The modal stack |
+| `modal_confirm.go`, `modal_input.go` | Yes/no question and text prompt in the status bar |
+| `modal_conflict.go` | Overwrite questions for a copy or move |
+| `modal_favorites.go`, `modal_log.go`, `modal_preview.go` | Favorites, error log and file preview |
 | `commands.go` | Commands that do I/O and return a message |
 | `msg.go` | The message types |
 | `fs.go` | Filesystem helpers: listing, the copy/move plan, copy, move, drives |
 | `keys.go` | The key map: every shortcut, its Alt binding and F-key alias |
 | `view.go`, `styles.go` | Rendering and its styles |
-| `utils.go` | Fuzzy matching and text wrapping |
+| `utils.go` | Fuzzy matching, text wrapping and small helpers |
 
 Copy and move are planned, resolved and only then executed. `planBatch` sorts a batch into clean
-entries, conflicts and refused entries without touching anything; `Update` asks about each
-conflict; `transferFiles` runs the batch and re-checks the same safety rules.
+entries, conflicts and refused entries without touching anything; a conflict modal asks about
+each conflict; `transferFiles` runs the batch and re-checks the same safety rules.
 
 The shortcut table above mirrors `keys.go`; `docs_test.go` fails when they disagree, so a new or
 changed shortcut needs a matching row. For development commands and CI see the

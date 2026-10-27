@@ -6,7 +6,8 @@ import (
 	"os"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 // file represents a file or directory entry.
@@ -33,16 +34,29 @@ type fileConflict struct {
 
 // pane represents one of the two file listing panels.
 type pane struct {
-	id          int
-	path        string
-	files       []file
-	selected    map[string]struct{} // Paths of selected files
-	cursor      int
-	active      bool
-	viewportY   int // Top of the visible area in the file list
-	height      int // Height of the pane's display area
-	width       int // Width of the pane's display area
-	searchQuery string
+	id        int
+	path      string
+	files     []file
+	selected  map[string]struct{} // Paths of selected files
+	cursor    int
+	active    bool
+	viewportY int             // Top of the visible area in the file list
+	height    int             // Height of the pane's content, inside its border
+	width     int             // Width of the pane's content, inside its border
+	search    textinput.Model // Quick-search query
+}
+
+// newPane returns an empty pane; loadDirectoryCmd fills it.
+func newPane(id int, path string) pane {
+	search := textinput.New()
+	search.Focus() // It only gets the keys pane.update passes on to it
+	return pane{id: id, path: path, selected: make(map[string]struct{}), search: search}
+}
+
+// boxSize is the size of the pane on screen, border included. Modals shown in place of
+// the pane fill the same box.
+func (p pane) boxSize() (width, height int) {
+	return p.width + 2, p.height + 2
 }
 
 // logEntry is one line of the error log.
@@ -53,41 +67,18 @@ type logEntry struct {
 
 // model is the main application model.
 type model struct {
-	leftPane              pane
-	rightPane             pane
-	quitting              bool
-	toast                 string     // Latest error, shown in the status bar until it expires
-	toastID               int        // Identifies the toast a toastExpiredMsg is meant for
-	errLog                []logEntry // Every error reported, oldest first
-	isLogOpen             bool
-	logScrollY            int // Lines scrolled up from the newest log entry
-	isCreatingFolder      bool
-	folderNameInput       string
-	isDeleting            bool
-	filesToDelete         []file
-	isConfirmingOverwrite bool
-	overwriteConflicts    []fileConflict // Conflicts still waiting for a decision
-	pendingClean          []file         // Files of the batch with no conflict, executed with the resolved ones
-	toOverwrite           []file         // Conflicting files the user chose to overwrite
-	operationDest         string         // Destination directory of the pending copy/move
-	isMoving              bool           // To know if the operation is a move or copy
-	isPreviewing          bool
-	previewContent        string
-	previewFilePath       string
-	previewWidth          int
-	previewHeight         int
-	previewScrollY        int
-	keyMap                KeyMap
-	modifierState         ModifierState
-	aliasMap              map[string]string
-	favorites             []string
-	drives                []string
-	isFavoritesOpen       bool
-	favoritesCursor       int
-	isConfirmingRemoveFav bool
-	favToRemove           int
-	isConfirmingUnmount   bool
-	driveToUnmount        string
+	leftPane      pane
+	rightPane     pane
+	modals        []modal // Open dialogs, the one on top last; see modal.go
+	quitting      bool
+	toast         string     // Latest error, shown in the status bar until it expires
+	toastID       int        // Identifies the toast a toastExpiredMsg is meant for
+	errLog        []logEntry // Every error reported, oldest first
+	keyMap        KeyMap
+	modifierState ModifierState
+	aliasMap      map[string]string
+	favorites     []string
+	drives        []string
 }
 
 // ModifierState tracks the state of modifier keys.
@@ -104,28 +95,32 @@ func initialModel() model {
 		log.Fatal(err)
 	}
 
-	favorites := getStandardPaths()
-	drives := getMountedDrives()
-
 	km := DefaultKeyMap()
-	return model{
-		leftPane: pane{
-			id:       0,
-			path:     cwd,
-			active:   true,
-			selected: make(map[string]struct{}),
-		},
-		rightPane: pane{
-			id:       1,
-			path:     cwd,
-			active:   false,
-			selected: make(map[string]struct{}),
-		},
+	m := model{
+		leftPane:  newPane(0, cwd),
+		rightPane: newPane(1, cwd),
 		keyMap:    km,
 		aliasMap:  km.GetAliasMap(),
-		favorites: favorites,
-		drives:    drives,
+		favorites: getStandardPaths(),
+		drives:    getMountedDrives(),
 	}
+	m.leftPane.active = true
+	return m
+}
+
+// activePane is the pane the keyboard acts on; copy and move go from it to the inactive one.
+func (m *model) activePane() *pane {
+	if m.rightPane.active {
+		return &m.rightPane
+	}
+	return &m.leftPane
+}
+
+func (m *model) inactivePane() *pane {
+	if m.rightPane.active {
+		return &m.leftPane
+	}
+	return &m.rightPane
 }
 
 // Init initializes the application.

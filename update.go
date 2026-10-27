@@ -4,22 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+	"unicode"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
-
-// ensureCursorInBounds validates and adjusts cursor position to be within file list bounds
-func ensureCursorInBounds(p *pane) {
-	if p.cursor >= len(p.files) {
-		if len(p.files) > 0 {
-			p.cursor = len(p.files) - 1
-		} else {
-			p.cursor = 0
-		}
-	}
-}
 
 // toastDuration is how long an error stays in the status bar; the log keeps it for good.
 var toastDuration = 5 * time.Second
@@ -50,477 +41,18 @@ func (m *model) reportError(err error) tea.Cmd {
 	return tea.Tick(toastDuration, func(time.Time) tea.Msg { return toastExpiredMsg{id: id} })
 }
 
-// logRows is how many log lines fit in the log overlay.
-func (m model) logRows() int {
-	return max(m.leftPane.height-2, 1) // Title and hint lines; both panes share a height
-}
-
-// maxLogScroll is the furthest the log can scroll up from its newest line.
-func (m model) maxLogScroll() int {
-	return max(len(m.logLines())-m.logRows(), 0)
-}
-
-// resolveConflicts runs the pending copy/move once every conflict has been decided:
-// the files that had no conflict together with the ones chosen for overwriting.
-func (m *model) resolveConflicts() tea.Cmd {
-	if len(m.overwriteConflicts) > 0 {
-		return nil // Still waiting for a decision
-	}
-	files := append(append([]file{}, m.pendingClean...), m.toOverwrite...)
-	dest, move := m.operationDest, m.isMoving
-	m.cancelTransfer()
-	if len(files) == 0 {
-		return nil
-	}
-	return transferFilesCmd(files, dest, move)
-}
-
-// cancelTransfer drops the pending copy/move without touching any file.
-func (m *model) cancelTransfer() {
-	m.isConfirmingOverwrite = false
-	m.overwriteConflicts = nil
-	m.pendingClean = nil
-	m.toOverwrite = nil
-	m.operationDest = ""
-}
-
-// Update handles messages and updates the model.
+// Update handles messages and updates the model. Results of commands are applied first,
+// whatever dialog is open; everything else (keys, pastes) goes to the modal on top of the
+// stack if there is one, and otherwise to the shortcuts and then to the active pane.
+//
+// Where a command comes from a method of m, it is assigned before returning because Go does
+// not order the evaluation of m against the method call in `return m, m.f()`.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-
-	// Track modifiers (basic implementation) - REMOVED FUNCTIONALITY
-	// switch msg := msg.(type) {
-	// case tea.KeyMsg:
-	// ...
-	// }
-	// User requested to remove this functionality for now.
-
-	// Handle operations that take precedence over normal key presses
-	if m.isCreatingFolder {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			key := msg.String()
-			if mapKey, ok := m.aliasMap[key]; ok {
-				key = mapKey
-			}
-			switch key {
-			case "enter":
-				activePane := &m.leftPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-				}
-				m.isCreatingFolder = false
-				cmd = createFolderCmd(filepath.Join(activePane.path, m.folderNameInput))
-				m.folderNameInput = ""
-				return m, cmd
-			case "esc":
-				m.isCreatingFolder = false
-				m.folderNameInput = ""
-				return m, nil
-			case "backspace":
-				if len(m.folderNameInput) > 0 {
-					m.folderNameInput = m.folderNameInput[:len(m.folderNameInput)-1]
-				}
-				return m, nil
-			default:
-				if len(msg.String()) == 1 {
-					m.folderNameInput += msg.String()
-				}
-				return m, nil
-			}
-		}
-	} else if m.isDeleting {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "y", "Y":
-				activePane := &m.leftPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-				}
-				m.isDeleting = false
-				cmd = deleteFilesCmd(m.filesToDelete)
-				m.filesToDelete = nil                           // Clear files to delete
-				activePane.selected = make(map[string]struct{}) // Clear selection
-				return m, cmd
-			case "n", "N", "esc":
-				m.isDeleting = false
-				m.filesToDelete = nil // Clear files to delete
-				return m, nil
-			}
-		}
-	} else if m.isConfirmingOverwrite {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			// Each key decides one conflict; the batch runs only once all are decided.
-			// cmd is assigned before returning because Go does not order the
-			// evaluation of m against the method call in `return m, m.f()`.
-			case "y", "Y": // Overwrite this file
-				m.toOverwrite = append(m.toOverwrite, m.overwriteConflicts[0].Source)
-				m.overwriteConflicts = m.overwriteConflicts[1:]
-				cmd = m.resolveConflicts()
-				return m, cmd
-
-			case "n", "N": // Skip this file
-				m.overwriteConflicts = m.overwriteConflicts[1:]
-				cmd = m.resolveConflicts()
-				return m, cmd
-
-			case "a", "A": // Overwrite all remaining
-				for _, conflict := range m.overwriteConflicts {
-					m.toOverwrite = append(m.toOverwrite, conflict.Source)
-				}
-				m.overwriteConflicts = nil
-				cmd = m.resolveConflicts()
-				return m, cmd
-
-			case "s", "S": // Skip all remaining
-				m.overwriteConflicts = nil
-				cmd = m.resolveConflicts()
-				return m, cmd
-
-			case "esc": // Cancel the whole operation
-				m.cancelTransfer()
-				return m, nil
-			}
-		}
-	} else if m.isFavoritesOpen {
-		if m.isConfirmingUnmount {
-			switch msg := msg.(type) {
-			case tea.KeyMsg:
-				switch msg.String() {
-				case "y", "Y":
-					m.isConfirmingUnmount = false
-					path := m.driveToUnmount
-					m.driveToUnmount = ""
-					return m, unmountDriveCmd(path)
-				case "n", "N", "esc":
-					m.isConfirmingUnmount = false
-					m.driveToUnmount = ""
-					return m, nil
-				}
-			}
-		} else if m.isConfirmingRemoveFav {
-			switch msg := msg.(type) {
-			case tea.KeyMsg:
-				switch msg.String() {
-				case "y", "Y":
-					if m.favToRemove >= 0 && m.favToRemove < len(m.favorites) {
-						// Remove favorite
-						m.favorites = append(m.favorites[:m.favToRemove], m.favorites[m.favToRemove+1:]...)
-
-						// Adjust cursor if out of bounds (but account for drives)
-						totalItems := len(m.favorites) + len(m.drives)
-						if m.favoritesCursor >= totalItems && totalItems > 0 {
-							m.favoritesCursor = totalItems - 1
-						}
-						// If user deleted the last favorite and there are drives below,
-						// the cursor (which was at favToRemove) now points to the drive that shifted up.
-						// We don't need to decrement unless we were at the very end of the *entire* list.
-					}
-					m.isConfirmingRemoveFav = false
-					m.favToRemove = -1
-					return m, nil
-				case "n", "N", "esc":
-					m.isConfirmingRemoveFav = false
-					m.favToRemove = -1
-					return m, nil
-				}
-			}
-		} else {
-			switch msg := msg.(type) {
-			case tea.KeyMsg:
-				switch msg.String() {
-				case "esc", "q", "alt+f":
-					m.isFavoritesOpen = false
-					return m, nil
-				case "up", "k":
-					if m.favoritesCursor > 0 {
-						m.favoritesCursor--
-					}
-				case "down", "j":
-					totalItems := len(m.favorites) + len(m.drives)
-					if m.favoritesCursor < totalItems-1 {
-						m.favoritesCursor++
-					}
-				case "home":
-					m.favoritesCursor = 0
-				case "end":
-					totalItems := len(m.favorites) + len(m.drives)
-					if totalItems > 0 {
-						m.favoritesCursor = totalItems - 1
-					}
-				case "enter":
-					totalItems := len(m.favorites) + len(m.drives)
-					if totalItems > 0 && m.favoritesCursor < totalItems {
-						var selectedPath string
-						if m.favoritesCursor < len(m.favorites) {
-							selectedPath = m.favorites[m.favoritesCursor]
-						} else {
-							selectedPath = m.drives[m.favoritesCursor-len(m.favorites)]
-						}
-						m.isFavoritesOpen = false
-						if m.leftPane.active {
-							return m, m.leftPane.loadDirectoryCmd(selectedPath, "")
-						} else {
-							return m, m.rightPane.loadDirectoryCmd(selectedPath, "")
-						}
-					}
-				case "delete", "d":
-					if len(m.favorites) > 0 && m.favoritesCursor < len(m.favorites) {
-						// Remove from favorites
-						m.isConfirmingRemoveFav = true
-						m.favToRemove = m.favoritesCursor
-					} else if m.favoritesCursor >= len(m.favorites) && len(m.drives) > 0 {
-						// Unmount drive
-						driveIdx := m.favoritesCursor - len(m.favorites)
-						if driveIdx < len(m.drives) {
-							m.isConfirmingUnmount = true
-							m.driveToUnmount = m.drives[driveIdx]
-						}
-					}
-				}
-			}
-		}
-	} else if m.isLogOpen {
-		if msg, ok := msg.(tea.KeyMsg); ok {
-			switch msg.String() {
-			case "esc", "q", m.keyMap.ErrorLog.Key:
-				m.isLogOpen = false
-			case "up", "k":
-				m.logScrollY = min(m.logScrollY+1, m.maxLogScroll())
-			case "down", "j":
-				m.logScrollY = max(m.logScrollY-1, 0)
-			case "pgup":
-				m.logScrollY = min(m.logScrollY+m.logRows(), m.maxLogScroll())
-			case "pgdown":
-				m.logScrollY = max(m.logScrollY-m.logRows(), 0)
-			case "home", "g":
-				m.logScrollY = m.maxLogScroll()
-			case "end", "G":
-				m.logScrollY = 0
-			}
-			return m, nil // The log owns the keyboard while open
-		}
-	} else if m.isPreviewing {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "esc", "q":
-				m.isPreviewing = false
-				m.previewContent = ""
-				m.previewFilePath = ""
-				m.previewScrollY = 0
-				return m, nil
-			case "up", "k":
-				if m.previewScrollY > 0 {
-					m.previewScrollY--
-				}
-				return m, nil
-			case "down", "j":
-				// Calculate max scroll
-				innerWidth := m.previewWidth - 6
-				innerHeight := m.previewHeight - 4
-				wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
-				maxScroll := len(wrappedLines) - innerHeight
-				if maxScroll < 0 {
-					maxScroll = 0
-				}
-
-				if m.previewScrollY < maxScroll {
-					m.previewScrollY++
-				}
-				return m, nil
-			case "pgup":
-				m.previewScrollY -= m.previewHeight
-				if m.previewScrollY < 0 {
-					m.previewScrollY = 0
-				}
-				return m, nil
-			case "pgdown":
-				// Calculate max scroll
-				innerWidth := m.previewWidth - 6
-				innerHeight := m.previewHeight - 4
-				wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
-				maxScroll := len(wrappedLines) - innerHeight
-				if maxScroll < 0 {
-					maxScroll = 0
-				}
-
-				m.previewScrollY += m.previewHeight
-				if m.previewScrollY > maxScroll {
-					m.previewScrollY = maxScroll
-				}
-				return m, nil
-			case "home", "g":
-				m.previewScrollY = 0
-				return m, nil
-			case "end", "G":
-				// Calculate max scroll
-				innerWidth := m.previewWidth - 6
-				innerHeight := m.previewHeight - 4
-				wrappedLines := calculateWrappedLines(m.previewContent, innerWidth)
-				maxScroll := len(wrappedLines) - innerHeight
-				if maxScroll < 0 {
-					maxScroll = 0
-				}
-				m.previewScrollY = maxScroll
-				return m, nil
-			}
-		}
-	} else { // Normal operation mode
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			key := msg.String()
-			if mapKey, ok := m.aliasMap[key]; ok {
-				key = mapKey
-			}
-			switch key {
-			case m.keyMap.Quit.Key: // Quit
-				m.quitting = true
-				return m, tea.Quit
-			case m.keyMap.ForceQuit.Key: // Force Quit
-				m.quitting = true
-				return m, tea.Quit
-			case m.keyMap.SwitchPane.Key:
-				m.leftPane.active = !m.leftPane.active
-				m.rightPane.active = !m.rightPane.active
-				return m, nil
-			case m.keyMap.Preview.Key: // Preview
-				activePane := &m.leftPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-				}
-				if len(activePane.files) > 0 {
-					selectedFile := activePane.files[activePane.cursor]
-					if !selectedFile.IsDir {
-						m.isPreviewing = true
-						m.previewFilePath = selectedFile.Path
-						m.previewWidth = activePane.width
-						m.previewHeight = activePane.height
-						m.previewScrollY = 0
-						return m, previewFileCmd(selectedFile.Path)
-					}
-				}
-				return m, nil
-			case m.keyMap.Copy.Key: // Copy
-				sourcePane := &m.leftPane
-				destPane := &m.rightPane
-				if m.rightPane.active {
-					sourcePane = &m.rightPane
-					destPane = &m.leftPane
-				}
-				files := operationTargets(*sourcePane)
-				if len(files) > 0 {
-					sourcePane.selected = make(map[string]struct{}) // Clear selection
-					return m, planTransferCmd(files, destPane.path, false)
-				}
-				return m, nil
-			case m.keyMap.Move.Key: // Move
-				sourcePane := &m.leftPane
-				destPane := &m.rightPane
-				if m.rightPane.active {
-					sourcePane = &m.rightPane
-					destPane = &m.leftPane
-				}
-				files := operationTargets(*sourcePane)
-				if len(files) > 0 {
-					sourcePane.selected = make(map[string]struct{}) // Clear selection
-					return m, planTransferCmd(files, destPane.path, true)
-				}
-				return m, nil
-			case m.keyMap.NewFolder.Key: // New Folder
-				m.isCreatingFolder = true
-				return m, nil
-			case m.keyMap.Delete.Key: // Delete
-				activePane := &m.leftPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-				}
-				files := operationTargets(*activePane)
-				if len(files) > 0 {
-					m.isDeleting = true
-					m.filesToDelete = files
-				}
-				return m, nil
-			case m.keyMap.CopyPath.Key:
-				activePane := &m.leftPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-				}
-				files := getFilesFromSelected(*activePane)
-				if len(files) == 0 && len(activePane.files) > 0 {
-					files = []file{activePane.files[activePane.cursor]}
-				}
-				if len(files) > 0 {
-					var paths []string
-					for _, f := range files {
-						paths = append(paths, f.Path)
-					}
-					return m, copyToClipboardCmd(strings.Join(paths, "\n"))
-				}
-				return m, nil
-			case m.keyMap.ErrorLog.Key:
-				m.isLogOpen = true
-				m.logScrollY = 0
-				return m, nil
-			case m.keyMap.Favorites.Key:
-				m.isFavoritesOpen = true
-				m.favoritesCursor = 0
-				return m, nil
-			case m.keyMap.AddToFavorites.Key:
-				activePane := &m.leftPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-				}
-
-				pathToAdd := activePane.path
-				if len(activePane.files) > 0 {
-					f := activePane.files[activePane.cursor]
-					if f.IsDir && !f.IsParent {
-						pathToAdd = f.Path
-					}
-				}
-
-				// Check for duplicates
-				exists := false
-				for _, fav := range m.favorites {
-					if fav == pathToAdd {
-						exists = true
-						break
-					}
-				}
-				if !exists {
-					m.favorites = append(m.favorites, pathToAdd)
-				}
-			case m.keyMap.SyncPanes.Key:
-				activePane := &m.leftPane
-				inactivePane := &m.rightPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-					inactivePane = &m.leftPane
-				}
-				return m, inactivePane.loadDirectoryCmd(activePane.path, "")
-			case m.keyMap.OpenInOther.Key:
-				activePane := &m.leftPane
-				inactivePane := &m.rightPane
-				if m.rightPane.active {
-					activePane = &m.rightPane
-					inactivePane = &m.leftPane
-				}
-				if len(activePane.files) > 0 {
-					selectedFile := activePane.files[activePane.cursor]
-					if selectedFile.IsDir {
-						return m, inactivePane.loadDirectoryCmd(selectedFile.Path, "")
-					}
-				}
-				return m, nil
-			}
-		}
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		msg = layoutKey(key)
 	}
 
-	// Handle messages that are always processed
 	switch msg := msg.(type) {
 	case directoryLoadedMsg:
 		switch msg.paneID {
@@ -549,46 +81,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fileOpenedMsg:
 		cmd = m.reportError(msg.err)
 		return m, cmd
-	case clipboardCopiedMsg:
-		cmd = m.reportError(msg.err)
-		return m, cmd
 	case folderCreatedMsg:
 		if msg.err != nil {
 			cmd = m.reportError(msg.err)
 			return m, cmd
-		} else {
-			// Reload directory in active pane and focus on the newly created folder
-			if m.leftPane.active {
-				return m, m.leftPane.loadDirectoryCmd(m.leftPane.path, msg.folderPath)
-			} else {
-				return m, m.rightPane.loadDirectoryCmd(m.rightPane.path, msg.folderPath)
-			}
 		}
+		// Reload the active pane with the cursor on the new folder
+		p := m.activePane()
+		return m, p.loadDirectoryCmd(p.path, msg.folderPath)
 	case fileDeletedMsg:
 		// Reload even after a failure: some of the files may be gone.
 		cmd = m.reportError(msg.err)
-		activePane := &m.leftPane
-		if m.rightPane.active {
-			activePane = &m.rightPane
-		}
+		p := m.activePane()
 		// Adjust cursor if it's out of bounds after deletion
-		if activePane.cursor >= len(activePane.files)-1 && activePane.cursor > 0 {
-			activePane.cursor--
+		if p.cursor >= len(p.files)-1 && p.cursor > 0 {
+			p.cursor--
 		}
-		return m, tea.Batch(cmd, activePane.loadDirectoryCmd(activePane.path, ""))
+		return m, tea.Batch(cmd, p.loadDirectoryCmd(p.path, ""))
 	case transferPlannedMsg:
-		var errCmd tea.Cmd
 		if len(msg.plan.rejected) > 0 {
-			errCmd = m.reportError(errors.New(strings.Join(msg.plan.rejected, "\n")))
+			cmd = m.reportError(errors.New(strings.Join(msg.plan.rejected, "\n")))
 		}
-		m.isMoving = msg.move
-		m.operationDest = msg.destPath
-		m.pendingClean = msg.plan.clean
-		m.overwriteConflicts = msg.plan.conflicts
-		m.toOverwrite = nil
-		m.isConfirmingOverwrite = len(msg.plan.conflicts) > 0
-		cmd = m.resolveConflicts()
-		return m, tea.Batch(errCmd, cmd)
+		c := conflictModal{conflicts: msg.plan.conflicts, clean: msg.plan.clean, dest: msg.destPath, move: msg.move}
+		if len(c.conflicts) > 0 {
+			// Under any dialog opened while the batch was being planned: keys typed into that
+			// dialog must not answer the overwrite questions. They come once it closes, and the
+			// modal runs the batch when every conflict is decided.
+			m.modals = slices.Insert(slices.Clone(m.modals), 0, modal(c))
+			return m, cmd
+		}
+		return m, tea.Batch(cmd, c.run())
 	case fileOperationMsg: // For copy/move operations
 		// Reload both panes even after a failure: part of the batch may have gone through.
 		cmd = m.reportError(msg.err)
@@ -597,36 +119,143 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			cmd = m.reportError(msg.err)
 			return m, cmd
-		} else {
-			// Refresh drives list after successful unmount
-			m.drives = getMountedDrives()
-			totalItems := len(m.favorites) + len(m.drives)
-			if m.favoritesCursor >= totalItems && totalItems > 0 {
-				m.favoritesCursor = totalItems - 1
-			}
 		}
+		m.drives = getMountedDrives() // The favorites list clamps its cursor to the new list
 		return m, nil
 	case previewReadyMsg:
-		if msg.Err != nil {
-			m.isPreviewing = false
-			cmd = m.reportError(msg.Err)
-			return m, cmd
+		for i, md := range m.modals {
+			if p, ok := md.(previewModal); ok && p.path == msg.path {
+				if msg.err != nil {
+					m.setModal(i, nil) // Nothing to show
+				} else {
+					p.content = msg.content
+					m.setModal(i, p)
+				}
+				break
+			}
 		}
-		m.previewContent = msg.Content
-		return m, nil
-	default:
-		// logDebug("Unknown message: %T", msg)
+		cmd = m.reportError(msg.err)
+		return m, cmd
 	}
 
-	// Delegate updates to active pane only if not in an operation mode
-	if !m.isCreatingFolder && !m.isDeleting && !m.isConfirmingOverwrite && !m.isFavoritesOpen && !m.isPreviewing && !m.isLogOpen {
-		if m.leftPane.active {
-			m.leftPane, cmd = m.leftPane.update(msg)
-		} else {
-			m.rightPane, cmd = m.rightPane.update(msg)
+	// The modal on top owns the keyboard: nothing reaches the panes while one is open.
+	if len(m.modals) > 0 {
+		cmd = m.updateTopModal(msg)
+		return m, cmd
+	}
+
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		if cmd, ok := m.shortcut(msg); ok {
+			return m, cmd
 		}
 	}
+
+	// Anything else is navigation or quick search in the active pane.
+	p := m.activePane()
+	*p, cmd = p.update(msg)
 	return m, cmd
+}
+
+// layoutKey makes a key read the same in any keyboard layout. A terminal with the Kitty
+// keyboard protocol, asked for alternate keys (see View), also reports the key at the same
+// place on a US layout, and Key.String prefers that one. It is kept only for a key that types
+// something outside ASCII, so that Alt+F and Ctrl+C work in a Hebrew or Russian layout; a key
+// that types ASCII reads as typed, so AZERTY and Dvorak keep the letters printed on the keys.
+func layoutKey(key tea.KeyPressMsg) tea.KeyPressMsg {
+	if key.Code <= unicode.MaxASCII {
+		key.BaseCode = 0
+	}
+	return key
+}
+
+// shortcut runs the KeyMap action bound to key, if any; ok is false for any other key.
+func (m *model) shortcut(key tea.KeyPressMsg) (_ tea.Cmd, ok bool) {
+	k := key.String()
+	if mapKey, ok := m.aliasMap[k]; ok {
+		k = mapKey
+	}
+	p := m.activePane()
+	switch k {
+	case m.keyMap.Quit.Key, m.keyMap.ForceQuit.Key:
+		m.quitting = true
+		return tea.Quit, true
+	case m.keyMap.SwitchPane.Key:
+		m.leftPane.active = !m.leftPane.active
+		m.rightPane.active = !m.rightPane.active
+		return nil, true
+	case m.keyMap.Preview.Key:
+		if f, ok := p.cursorFile(); ok && !f.IsDir {
+			m.openModal(previewModal{path: f.Path})
+			return previewFileCmd(f.Path), true
+		}
+		return nil, true
+	case m.keyMap.Copy.Key, m.keyMap.Move.Key:
+		files := operationTargets(*p)
+		if len(files) == 0 {
+			return nil, true
+		}
+		p.selected = make(map[string]struct{}) // Clear selection
+		return planTransferCmd(files, m.inactivePane().path, k == m.keyMap.Move.Key), true
+	case m.keyMap.NewFolder.Key:
+		dir := p.path
+		m.openModal(newInputModal("Create folder: ", func(_ *model, name string) tea.Cmd {
+			if name == "" {
+				return nil
+			}
+			return createFolderCmd(filepath.Join(dir, name))
+		}))
+		return nil, true
+	case m.keyMap.Delete.Key:
+		files := operationTargets(*p)
+		if len(files) == 0 {
+			return nil, true
+		}
+		prompt := fmt.Sprintf("Delete %d items?", len(files))
+		if len(files) == 1 {
+			prompt = fmt.Sprintf("Delete %s?", files[0].Name)
+		}
+		m.openModal(newConfirmModal(prompt, func(m *model) tea.Cmd {
+			m.activePane().selected = make(map[string]struct{}) // Clear selection
+			return deleteFilesCmd(files)
+		}))
+		return nil, true
+	case m.keyMap.CopyPath.Key:
+		files := getFilesFromSelected(*p)
+		if f, ok := p.cursorFile(); ok && len(files) == 0 {
+			files = []file{f}
+		}
+		if len(files) == 0 {
+			return nil, true
+		}
+		var paths []string
+		for _, f := range files {
+			paths = append(paths, f.Path)
+		}
+		return copyToClipboardCmd(strings.Join(paths, "\n")), true
+	case m.keyMap.ErrorLog.Key:
+		m.openModal(logModal{})
+		return nil, true
+	case m.keyMap.Favorites.Key:
+		m.openModal(favoritesModal{})
+		return nil, true
+	case m.keyMap.AddToFavorites.Key:
+		pathToAdd := p.path
+		if f, ok := p.cursorFile(); ok && f.IsDir && !f.IsParent {
+			pathToAdd = f.Path
+		}
+		if !slices.Contains(m.favorites, pathToAdd) {
+			m.favorites = append(m.favorites, pathToAdd)
+		}
+		return nil, true
+	case m.keyMap.SyncPanes.Key:
+		return m.inactivePane().loadDirectoryCmd(p.path, ""), true
+	case m.keyMap.OpenInOther.Key:
+		if f, ok := p.cursorFile(); ok && f.IsDir {
+			return m.inactivePane().loadDirectoryCmd(f.Path, ""), true
+		}
+		return nil, true
+	}
+	return nil, false
 }
 
 // applyListing installs a listing from loadDirectoryCmd. A listing of another path moves
@@ -655,66 +284,60 @@ func (p *pane) applyListing(msg directoryLoadedMsg) {
 		}
 	}
 	// Ensure cursor and viewport are within bounds after the listing shrank
-	ensureCursorInBounds(p)
+	p.cursor = clampIndex(p.cursor, len(p.files))
 	p.viewportY = min(p.viewportY, p.cursor)
+}
+
+// cursorFile is the entry under the cursor; ok is false in an empty listing.
+func (p pane) cursorFile() (_ file, ok bool) {
+	if p.cursor >= len(p.files) {
+		return file{}, false
+	}
+	return p.files[p.cursor], true
 }
 
 // update handles messages for a pane.
 func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "home":
 			p.cursor = 0
 		case "end":
-			if len(p.files) > 0 {
-				p.cursor = len(p.files) - 1
-			} else {
-				p.cursor = 0
-			}
+			p.cursor = max(len(p.files)-1, 0)
 		case "up":
-			p.searchQuery = "" // Clear search on navigation
+			p.search.Reset() // Clear search on navigation
 			if p.cursor > 0 {
 				p.cursor--
 			}
 		case "down":
-			p.searchQuery = "" // Clear search on navigation
+			p.search.Reset() // Clear search on navigation
 			if p.cursor < len(p.files)-1 {
 				p.cursor++
 			}
 		case "pgup":
-			p.searchQuery = "" // Clear search on navigation
-			p.cursor -= p.height
-			if p.cursor < 0 {
-				p.cursor = 0
-			}
+			p.search.Reset() // Clear search on navigation
+			p.cursor = max(p.cursor-p.height, 0)
 		case "pgdown":
-			p.searchQuery = "" // Clear search on navigation
-			if len(p.files) > 0 {
-				p.cursor += p.height
-				if p.cursor >= len(p.files) {
-					p.cursor = len(p.files) - 1
-				}
-			}
+			p.search.Reset() // Clear search on navigation
+			p.cursor = clampIndex(p.cursor+p.height, len(p.files))
 		case "enter":
-			p.searchQuery = "" // Clear search on navigation
-			if len(p.files) > 0 {
-				selectedFile := p.files[p.cursor]
-				if selectedFile.IsDir {
-					// Check if it's the parent directory entry ".."
-					if selectedFile.IsParent {
-						return p, p.loadDirectoryCmd(selectedFile.Path, p.path)
-					}
-					return p, p.loadDirectoryCmd(selectedFile.Path, "")
-				} else {
-					return p, openFileCmd(selectedFile.Path)
+			p.search.Reset() // Clear search on navigation
+			if f, ok := p.cursorFile(); ok {
+				switch {
+				case f.IsParent: // Back up with the cursor on the directory we leave
+					return p, p.loadDirectoryCmd(f.Path, p.path)
+				case f.IsDir:
+					return p, p.loadDirectoryCmd(f.Path, "")
+				default:
+					return p, openFileCmd(f.Path)
 				}
 			}
 		case "esc":
-			p.searchQuery = "" // Clear search explicitly
+			p.search.Reset() // Clear search explicitly
 		case "insert":
-			if len(p.files) > 0 {
-				if f := p.files[p.cursor]; !f.IsParent {
+			if f, ok := p.cursorFile(); ok {
+				if !f.IsParent {
 					if _, ok := p.selected[f.Path]; ok {
 						delete(p.selected, f.Path)
 					} else {
@@ -726,33 +349,17 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 					p.cursor++
 				}
 			}
+		case "backspace":
+			if p.search.Value() != "" {
+				p = p.quickSearch(msg)
+			}
 		default:
-			// Handle active search
-			if len(msg.String()) == 1 { // Only process single character inputs
-				p.searchQuery += msg.String()
-				lowerQuery := strings.ToLower(p.searchQuery)
-
-				// Priority 1: Prefix match
-				found := false
-				for i, f := range p.files {
-					if strings.HasPrefix(strings.ToLower(f.Name), lowerQuery) {
-						p.cursor = i
-						found = true
-						break
-					}
-				}
-
-				// Priority 2: Fuzzy match
-				if !found {
-					for i, f := range p.files {
-						if fuzzyMatch(p.searchQuery, f.Name) {
-							p.cursor = i
-							break
-						}
-					}
-				}
+			if msg.Text != "" { // A typed character, in any script
+				p = p.quickSearch(msg)
 			}
 		}
+	case tea.PasteMsg:
+		p = p.quickSearch(oneLinePaste(msg))
 	}
 
 	// Ensure viewport is within bounds
@@ -764,4 +371,22 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 	}
 
 	return p, nil
+}
+
+// quickSearch edits the quick-search query with msg (a typed character, Backspace or a
+// paste) and moves the cursor to the first entry whose name starts with the query, or else
+// to the first one that contains its characters in order.
+func (p pane) quickSearch(msg tea.Msg) pane {
+	// The query's cursor is never drawn, so the command that would make it blink is dropped.
+	p.search, _ = p.search.Update(msg)
+	query := strings.ToLower(p.search.Value())
+	if query == "" {
+		return p
+	}
+	if i := slices.IndexFunc(p.files, func(f file) bool { return strings.HasPrefix(strings.ToLower(f.Name), query) }); i >= 0 {
+		p.cursor = i
+	} else if i := slices.IndexFunc(p.files, func(f file) bool { return fuzzyMatch(query, f.Name) }); i >= 0 {
+		p.cursor = i
+	}
+	return p
 }

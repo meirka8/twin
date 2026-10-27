@@ -3,7 +3,8 @@ package main
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // calculateWrappedLines wraps the content to fit the given width and returns the lines.
@@ -30,4 +31,16 @@ func fuzzyMatch(query, target string) bool {
 		}
 	}
 	return qIdx == len(queryRunes)
+}
+
+// clampIndex limits i to the indexes of a list of n items, or 0 when the list is empty.
+func clampIndex(i, n int) int {
+	return max(min(i, n-1), 0)
+}
+
+// oneLinePaste readies a paste for a one-line text field. The line break that comes along
+// when a whole line is copied is dropped; textinput turns any other into a space.
+func oneLinePaste(msg tea.PasteMsg) tea.PasteMsg {
+	msg.Content = strings.TrimRight(msg.Content, "\r\n")
+	return msg
 }
