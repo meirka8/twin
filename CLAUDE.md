@@ -38,17 +38,29 @@ shortcut table in DOCUMENTATION.md matches `keys.go`.
 The app follows Bubble Tea's Model-View-Update (MVU) pattern, split across files by
 responsibility rather than by feature:
 
-- `model.go` — the `model` struct (whole app state, including the modal stack `modals`) and
-  `pane` struct (one of the two directory panes: path, files, cursor, viewport, selection,
-  quick-search `textinput`). `newPane` and `initialModel()` build the starting state; `Init()`
-  kicks off the initial directory loads for both panes. `activePane()` / `inactivePane()`
-  return pointers to the panes.
+- `model.go` — the `model` struct (whole app state: both panes, the modal stack `modals`, the
+  error log, favorites). `initialModel()` builds the starting state; `Init()` kicks off the
+  initial directory loads for both panes. `activePane()` / `inactivePane()` return pointers
+  to the panes.
+- `pane.go` — the `pane` component: one directory of a `Source` (`source`, `path`), its
+  listing, cursor, viewport, selection and quick-search `textinput`. `loadDirectoryCmd` /
+  `reloadCmd` list a directory through `listDir`, which sorts it (directories first) and puts
+  `..` from `Source.Parent` in front; `applyListing` installs the result. `targets()` /
+  `selectedFiles()` pick what an operation acts on; `update()` handles navigation and quick
+  search; `view()` renders the pane.
+- `source.go` — the `Source` interface (`List`, `Parent`, `Open`) and `localFS`, the only
+  implementation so far. A pane reads only through its source, so archives, SFTP or search
+  results can plug in later. Everything that changes files or hands them to another program
+  (copy, move, delete, mkdir, xdg-open, favorites) runs only on `localFS`, so a path of another
+  source never reaches `os`: the shortcut refuses with `localOnly` for the user's sake, and the
+  command, which takes the source(s), checks again. Copy Path is the exception: it copies text.
+  A pane that changes source drops its selection, since paths of different sources can look
+  alike. Sources are compared with `==`; add `var _ = assertComparable[T]` for a new one.
 - `update.go` — `Update()`, the core control flow. It first switches on async result messages
   (`directoryLoadedMsg`, `fileOperationMsg`, `transferPlannedMsg`, etc.), which apply whatever
   modal is open. Every other message (keys, pastes) goes to the modal on top of the stack if
-  there is one, otherwise to `shortcut()` (the `KeyMap` actions) and then to the active pane.
-  Pane-local navigation (cursor movement, quick search, entering directories) lives in
-  `pane.update()` at the bottom of the file.
+  there is one, otherwise to `shortcut()` (the `KeyMap` actions) and then to the active
+  pane's `update()`.
 - `modal.go` — the `modal` interface and the stack (`openModal`, `setModal`,
   `updateTopModal`). Modals are values: `update(m *model, msg)` returns the modal's new state,
   or nil to close it, and may open another modal over itself with `m.openModal`. A modal
@@ -61,14 +73,16 @@ responsibility rather than by feature:
   question and text prompt, each taking a callback), `modal_conflict.go` (per-file overwrite
   questions; it runs the copy/move batch), `modal_favorites.go`, `modal_log.go`,
   `modal_preview.go`.
-- `commands.go` — `tea.Cmd` constructors that perform actual I/O (filesystem ops, `xdg-open`,
-  `umount`, clipboard) inside a returned closure and report results via a message type. Follow
+- `commands.go` — `tea.Cmd` constructors that perform actual I/O (filesystem ops, `xdg-open`
+  through the `launch` variable, which tests stub, `umount`, clipboard) inside a returned
+  closure and report results via a message type. Follow
   this pattern for new I/O: never mutate model state directly from a command closure — return
   a message and handle it in `Update`.
 - `msg.go` — message types returned by commands (e.g. `directoryLoadedMsg`, `fileDeletedMsg`,
   `fileConflictMsg`, `previewReadyMsg`) that `Update` switches on.
-- `fs.go` — filesystem helpers with no Bubble Tea dependency: `readDirectory` (sorts dirs
-  first, injects a synthetic `..` entry), recursive `copyFile`/`copyDir`, `getMountedDrives`
+- `fs.go` — local filesystem helpers with no Bubble Tea dependency: `readDirectory` (the raw
+  entries of `localFS.List`, symlinks resolved), the copy/move plan (`planBatch`) and
+  `transferFiles`, recursive `copyFile`/`copyDir`, `getMountedDrives`
   (parses `/proc/mounts`, filters to `/media`, `/mnt`, `/run/media`), `getStandardPaths` (home
   + XDG-style user dirs for the favorites list).
 - `keys.go` — `KeyMap`/`Shortcut`: every action has a canonical `alt+<letter>` binding plus an
@@ -77,7 +91,7 @@ responsibility rather than by feature:
   so a new shortcut must be added to `KeyMap` (and `GetShortcuts()`) rather than matched as a
   raw string, and to the shortcut table in DOCUMENTATION.md.
 - `view.go` — `View()` (a `tea.View`: alt screen and keyboard enhancements are declared there)
-  and the render helpers for the two panes, status bar and hints bar. A modal's pane view is
+  and the layout: the two panes (each from `pane.view()`), status bar and hints bar. A modal's pane view is
   cut to the pane's box, so it never shifts the other pane. Lip Gloss v2 counts borders and
   padding in `Width`/`Height`: `pane.width`/`height` are the content size inside the border,
   `pane.boxSize()` the size on screen.
@@ -88,7 +102,7 @@ responsibility rather than by feature:
 ### Key conventions
 
 - File operations (copy/move) always operate from the *active* pane to the *inactive* pane's
-  current path. Targets come from `operationTargets`: the selection, or the file under the
+  current path. Targets come from `pane.targets()`: the selection, or the file under the
   cursor when nothing is selected. Selections are cleared on copy/move/delete.
 - The synthetic `..` entry has `IsParent` set and is never a target: it can't be selected,
   deleted, copied or moved. Use `IsParent`, not `Name == ".."`.
@@ -101,9 +115,10 @@ responsibility rather than by feature:
 - Errors go through `m.reportError(err)`, which appends to the error log (Alt+L) and shows
   a status-bar toast; return the command it gives back so the toast expires. Never drop an
   error or store it without reporting it.
-- `loadDirectoryCmd(path, focusPath)` both reloads (the pane's own path) and navigates
-  (another path). The pane only moves to `path` once the listing succeeds, so don't set
-  `pane.path` yourself before loading.
+- `loadDirectoryCmd(source, path, focusPath)` both reloads (the pane's own location; use
+  `reloadCmd(focusPath)`) and navigates (another path, or another source: Sync Panes copies
+  the active pane's source, favorites go back to `localFS{}`). The pane only moves once the
+  listing succeeds, so don't set `pane.source` or `pane.path` yourself before loading.
 - Directory reloads pass an optional `focusPath` so the cursor can be restored to a specific
   entry after the reload (e.g. focus the newly created folder, or the parent's own path when
   navigating up via `..`).

@@ -167,8 +167,10 @@ is kept.
 ### File preview
 
 Alt+V (F3) shows the file under the cursor in place of the active pane; the other pane stays
-visible; on a directory it does nothing. Long lines wrap. Only text is shown: a binary file (invalid UTF-8 or a NUL byte) shows a
-placeholder, and only the first 100 KB of a larger file is shown.
+visible; on a directory it does nothing. Long lines wrap. Only the first 100 KB of a larger file
+is read and shown, so a huge file opens as fast as a small one. Only text is shown: a file
+whose first 100 KB are not valid UTF-8 or hold a NUL byte shows a "binary" placeholder. FIFOs, sockets and device files are
+not previewed.
 
 | Key | Action |
 | --- | --- |
@@ -225,7 +227,6 @@ These are tracked in the [roadmap](Twin%20%E2%80%94%20Roadmap.md).
 - Delete is permanent; there is no trash and no undo.
 - Copy and move show no progress and cannot be cancelled.
 - Nothing is saved between sessions, favorites included, and there is no config file.
-- Preview reads the whole file before cutting it at 100 KB, so previewing a huge file is slow.
 - Long names and paths are not shortened to fit the pane.
 - An entry whose details cannot be read while listing a directory is left out of the listing,
   and no error is shown.
@@ -239,6 +240,11 @@ whole state is one `model`; `Update` turns key presses and results into a new mo
 renders it. Anything that touches the disk runs in a command off the UI thread and reports back
 with a message, so the interface does not freeze.
 
+Each pane shows a directory of a *source* and reads its entries and files only through it. The
+local filesystem is the only source so far; archives, remote filesystems and search results are
+meant to plug in as others. Copying, moving, deleting, creating folders and opening files with
+other programs are kept to the local filesystem.
+
 Dialogs are modals on a stack: the one on top gets every key press and paste until it closes,
 so nothing reaches the panes or the dialog below it. A modal draws either a line in the status
 bar or a panel in place of the active pane, so a question asked from the favorites list leaves
@@ -246,15 +252,17 @@ the list showing.
 
 | File | Contents |
 | --- | --- |
-| `model.go` | The `model` and `pane` state, and the initial state |
-| `update.go` | `Update`: results of commands, the shortcuts, pane navigation and quick search |
+| `model.go` | The `model` state and the initial state |
+| `pane.go` | A pane: its listing, cursor, selection, navigation, quick search and rendering |
+| `source.go` | Where a pane's entries come from, and the local filesystem |
+| `update.go` | `Update`: results of commands and the shortcuts |
 | `modal.go` | The modal stack |
 | `modal_confirm.go`, `modal_input.go` | Yes/no question and text prompt in the status bar |
 | `modal_conflict.go` | Overwrite questions for a copy or move |
 | `modal_favorites.go`, `modal_log.go`, `modal_preview.go` | Favorites, error log and file preview |
 | `commands.go` | Commands that do I/O and return a message |
 | `msg.go` | The message types |
-| `fs.go` | Filesystem helpers: listing, the copy/move plan, copy, move, drives |
+| `fs.go` | Local filesystem helpers: reading a directory, the copy/move plan, copy, move, drives |
 | `keys.go` | The key map: every shortcut, its Alt binding and F-key alias |
 | `view.go`, `styles.go` | Rendering and its styles |
 | `utils.go` | Fuzzy matching, text wrapping and small helpers |

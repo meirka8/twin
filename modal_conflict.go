@@ -15,7 +15,8 @@ type conflictModal struct {
 	conflicts   []fileConflict // Still waiting for a decision; the first is asked about
 	clean       []file         // Files of the batch with no conflict
 	toOverwrite []file         // Conflicting files the user chose to overwrite
-	dest        string         // Destination directory
+	src, dst    Source         // Where the files come from, and where they go
+	dest        string         // Destination directory, of dst
 	move        bool
 }
 
@@ -60,7 +61,7 @@ func (c conflictModal) run() tea.Cmd {
 	if len(files) == 0 {
 		return nil
 	}
-	return transferFilesCmd(files, c.dest, c.move)
+	return transferFilesCmd(c.src, files, c.dst, c.dest, c.move)
 }
 
 func (c conflictModal) paneView(*model, int, int) string { return "" }

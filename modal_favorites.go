@@ -36,7 +36,7 @@ func (f favoritesModal) update(m *model, msg tea.Msg) (modal, tea.Cmd) {
 		f.cursor = len(entries) - 1
 	case "enter":
 		if len(entries) > 0 {
-			return nil, m.activePane().loadDirectoryCmd(entries[f.cursor], "")
+			return nil, m.activePane().loadDirectoryCmd(localFS{}, entries[f.cursor], "")
 		}
 	case "delete", "d":
 		if len(entries) == 0 {
