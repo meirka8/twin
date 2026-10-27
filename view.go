@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"slices"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -32,7 +31,7 @@ func (m model) render() string {
 // the active pane's place, cut to the pane's box so that it never pushes the other pane
 // aside.
 func (m model) panesView() string {
-	left, right := paneView(m.leftPane), paneView(m.rightPane)
+	left, right := m.leftPane.view(), m.rightPane.view()
 	width, height := m.activePane().boxSize()
 	for _, md := range slices.Backward(m.modals) {
 		if s := md.paneView(&m, width, height); s != "" {
@@ -76,42 +75,6 @@ func (m model) statusBarView() string {
 	status := fmt.Sprintf("%s | %s | %s", f.Name, f.Mode.String(), f.ModTime.Format("2006-01-02 15:04:05"))
 	width := max(screenWidth-lipgloss.Width(search)-statusBar.GetHorizontalFrameSize(), 0)
 	return search + statusBar.Render(ansi.Truncate(status, width, "…"))
-}
-
-func paneView(p pane) string {
-	var s strings.Builder
-	s.WriteString(p.path + "\n")
-
-	for i := p.viewportY; i < len(p.files) && i < p.viewportY+p.height-2; i++ {
-		f := p.files[i]
-		name := f.Name
-		if f.IsSymlink {
-			name += "@" // As in ls -F
-		}
-		line := " " + name
-		if f.IsDir {
-			line = " " + dirStyle.Render(name)
-		}
-
-		_, isSelected := p.selected[f.Path]
-
-		if i == p.cursor {
-			s.WriteString(cursorStyle.Render(line))
-		} else if isSelected {
-			s.WriteString(selectionStyle.Render(line))
-		} else {
-			s.WriteString(line)
-		}
-		s.WriteString("\n")
-	}
-
-	style := inactiveStyle
-	if p.active {
-		style = activeStyle
-	}
-
-	width, height := p.boxSize()
-	return style.Width(width).Height(height).Render(s.String())
 }
 
 func (m model) hintsView() string {

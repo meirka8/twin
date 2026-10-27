@@ -87,8 +87,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		// Reload the active pane with the cursor on the new folder
-		p := m.activePane()
-		return m, p.loadDirectoryCmd(p.path, msg.folderPath)
+		return m, m.activePane().reloadCmd(msg.folderPath)
 	case fileDeletedMsg:
 		// Reload even after a failure: some of the files may be gone.
 		cmd = m.reportError(msg.err)
@@ -97,12 +96,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if p.cursor >= len(p.files)-1 && p.cursor > 0 {
 			p.cursor--
 		}
-		return m, tea.Batch(cmd, p.loadDirectoryCmd(p.path, ""))
+		return m, tea.Batch(cmd, p.reloadCmd(""))
 	case transferPlannedMsg:
 		if len(msg.plan.rejected) > 0 {
 			cmd = m.reportError(errors.New(strings.Join(msg.plan.rejected, "\n")))
 		}
-		c := conflictModal{conflicts: msg.plan.conflicts, clean: msg.plan.clean, dest: msg.destPath, move: msg.move}
+		c := conflictModal{conflicts: msg.plan.conflicts, clean: msg.plan.clean, src: msg.src, dst: msg.dst, dest: msg.destPath, move: msg.move}
 		if len(c.conflicts) > 0 {
 			// Under any dialog opened while the batch was being planned: keys typed into that
 			// dialog must not answer the overwrite questions. They come once it closes, and the
@@ -114,7 +113,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case fileOperationMsg: // For copy/move operations
 		// Reload both panes even after a failure: part of the batch may have gone through.
 		cmd = m.reportError(msg.err)
-		return m, tea.Batch(cmd, m.leftPane.loadDirectoryCmd(m.leftPane.path, ""), m.rightPane.loadDirectoryCmd(m.rightPane.path, ""))
+		return m, tea.Batch(cmd, m.leftPane.reloadCmd(""), m.rightPane.reloadCmd(""))
 	case driveUnmountedMsg:
 		if msg.err != nil {
 			cmd = m.reportError(msg.err)
@@ -124,7 +123,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case previewReadyMsg:
 		for i, md := range m.modals {
-			if p, ok := md.(previewModal); ok && p.path == msg.path {
+			if p, ok := md.(previewModal); ok && p.source == msg.source && p.path == msg.path {
 				if msg.err != nil {
 					m.setModal(i, nil) // Nothing to show
 				} else {
@@ -185,43 +184,54 @@ func (m *model) shortcut(key tea.KeyPressMsg) (_ tea.Cmd, ok bool) {
 		return nil, true
 	case m.keyMap.Preview.Key:
 		if f, ok := p.cursorFile(); ok && !f.IsDir {
-			m.openModal(previewModal{path: f.Path})
-			return previewFileCmd(f.Path), true
+			m.openModal(previewModal{source: p.source, path: f.Path})
+			return previewFileCmd(p.source, f.Path), true
 		}
 		return nil, true
 	case m.keyMap.Copy.Key, m.keyMap.Move.Key:
-		files := operationTargets(*p)
+		files := p.targets()
 		if len(files) == 0 {
 			return nil, true
 		}
+		move, dst := k == m.keyMap.Move.Key, m.inactivePane()
+		if err := localOnly(transferAction(move), p.source, dst.source); err != nil {
+			return m.reportError(err), true
+		}
 		p.selected = make(map[string]struct{}) // Clear selection
-		return planTransferCmd(files, m.inactivePane().path, k == m.keyMap.Move.Key), true
+		return planTransferCmd(p.source, files, dst.source, dst.path, move), true
 	case m.keyMap.NewFolder.Key:
-		dir := p.path
+		if err := localOnly("MkDir", p.source); err != nil {
+			return m.reportError(err), true
+		}
+		src, dir := p.source, p.path
 		m.openModal(newInputModal("Create folder: ", func(_ *model, name string) tea.Cmd {
 			if name == "" {
 				return nil
 			}
-			return createFolderCmd(filepath.Join(dir, name))
+			return createFolderCmd(src, filepath.Join(dir, name))
 		}))
 		return nil, true
 	case m.keyMap.Delete.Key:
-		files := operationTargets(*p)
+		files := p.targets()
 		if len(files) == 0 {
 			return nil, true
 		}
+		if err := localOnly("Delete", p.source); err != nil {
+			return m.reportError(err), true
+		}
+		src := p.source
 		prompt := fmt.Sprintf("Delete %d items?", len(files))
 		if len(files) == 1 {
 			prompt = fmt.Sprintf("Delete %s?", files[0].Name)
 		}
 		m.openModal(newConfirmModal(prompt, func(m *model) tea.Cmd {
 			m.activePane().selected = make(map[string]struct{}) // Clear selection
-			return deleteFilesCmd(files)
+			return deleteFilesCmd(src, files)
 		}))
 		return nil, true
 	case m.keyMap.CopyPath.Key:
-		files := getFilesFromSelected(*p)
-		if f, ok := p.cursorFile(); ok && len(files) == 0 {
+		files := p.selectedFiles()
+		if f, ok := p.cursorFile(); ok && len(files) == 0 { // ".." included: it names a directory
 			files = []file{f}
 		}
 		if len(files) == 0 {
@@ -239,6 +249,9 @@ func (m *model) shortcut(key tea.KeyPressMsg) (_ tea.Cmd, ok bool) {
 		m.openModal(favoritesModal{})
 		return nil, true
 	case m.keyMap.AddToFavorites.Key:
+		if err := localOnly("Add Fav", p.source); err != nil {
+			return m.reportError(err), true // Favorites are local directories
+		}
 		pathToAdd := p.path
 		if f, ok := p.cursorFile(); ok && f.IsDir && !f.IsParent {
 			pathToAdd = f.Path
@@ -248,145 +261,12 @@ func (m *model) shortcut(key tea.KeyPressMsg) (_ tea.Cmd, ok bool) {
 		}
 		return nil, true
 	case m.keyMap.SyncPanes.Key:
-		return m.inactivePane().loadDirectoryCmd(p.path, ""), true
+		return m.inactivePane().loadDirectoryCmd(p.source, p.path, ""), true
 	case m.keyMap.OpenInOther.Key:
 		if f, ok := p.cursorFile(); ok && f.IsDir {
-			return m.inactivePane().loadDirectoryCmd(f.Path, ""), true
+			return m.inactivePane().loadDirectoryCmd(p.source, f.Path, ""), true
 		}
 		return nil, true
 	}
 	return nil, false
-}
-
-// applyListing installs a listing from loadDirectoryCmd. A listing of another path moves
-// the pane there; if loading it failed, the pane stays where it was with its old listing.
-// A failed reload of the pane's own path still carries "..", so there is a way out.
-func (p *pane) applyListing(msg directoryLoadedMsg) {
-	if msg.path != p.path {
-		if msg.err != nil {
-			return
-		}
-		p.path = msg.path
-		p.cursor = 0
-		p.viewportY = 0
-	}
-	p.files = msg.files
-	if msg.focusPath != "" {
-		for i, f := range p.files {
-			if f.Path == msg.focusPath {
-				p.cursor = i
-				// Adjust viewport to make cursor visible
-				if p.cursor >= p.viewportY+p.height-2 {
-					p.viewportY = p.cursor - p.height + 3
-				}
-				break
-			}
-		}
-	}
-	// Ensure cursor and viewport are within bounds after the listing shrank
-	p.cursor = clampIndex(p.cursor, len(p.files))
-	p.viewportY = min(p.viewportY, p.cursor)
-}
-
-// cursorFile is the entry under the cursor; ok is false in an empty listing.
-func (p pane) cursorFile() (_ file, ok bool) {
-	if p.cursor >= len(p.files) {
-		return file{}, false
-	}
-	return p.files[p.cursor], true
-}
-
-// update handles messages for a pane.
-func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "home":
-			p.cursor = 0
-		case "end":
-			p.cursor = max(len(p.files)-1, 0)
-		case "up":
-			p.search.Reset() // Clear search on navigation
-			if p.cursor > 0 {
-				p.cursor--
-			}
-		case "down":
-			p.search.Reset() // Clear search on navigation
-			if p.cursor < len(p.files)-1 {
-				p.cursor++
-			}
-		case "pgup":
-			p.search.Reset() // Clear search on navigation
-			p.cursor = max(p.cursor-p.height, 0)
-		case "pgdown":
-			p.search.Reset() // Clear search on navigation
-			p.cursor = clampIndex(p.cursor+p.height, len(p.files))
-		case "enter":
-			p.search.Reset() // Clear search on navigation
-			if f, ok := p.cursorFile(); ok {
-				switch {
-				case f.IsParent: // Back up with the cursor on the directory we leave
-					return p, p.loadDirectoryCmd(f.Path, p.path)
-				case f.IsDir:
-					return p, p.loadDirectoryCmd(f.Path, "")
-				default:
-					return p, openFileCmd(f.Path)
-				}
-			}
-		case "esc":
-			p.search.Reset() // Clear search explicitly
-		case "insert":
-			if f, ok := p.cursorFile(); ok {
-				if !f.IsParent {
-					if _, ok := p.selected[f.Path]; ok {
-						delete(p.selected, f.Path)
-					} else {
-						p.selected[f.Path] = struct{}{}
-					}
-				}
-				// Move cursor down after selection/deselection
-				if p.cursor < len(p.files)-1 {
-					p.cursor++
-				}
-			}
-		case "backspace":
-			if p.search.Value() != "" {
-				p = p.quickSearch(msg)
-			}
-		default:
-			if msg.Text != "" { // A typed character, in any script
-				p = p.quickSearch(msg)
-			}
-		}
-	case tea.PasteMsg:
-		p = p.quickSearch(oneLinePaste(msg))
-	}
-
-	// Ensure viewport is within bounds
-	if p.cursor < p.viewportY {
-		p.viewportY = p.cursor
-	}
-	if p.cursor >= p.viewportY+p.height-2 {
-		p.viewportY = p.cursor - p.height + 3
-	}
-
-	return p, nil
-}
-
-// quickSearch edits the quick-search query with msg (a typed character, Backspace or a
-// paste) and moves the cursor to the first entry whose name starts with the query, or else
-// to the first one that contains its characters in order.
-func (p pane) quickSearch(msg tea.Msg) pane {
-	// The query's cursor is never drawn, so the command that would make it blink is dropped.
-	p.search, _ = p.search.Update(msg)
-	query := strings.ToLower(p.search.Value())
-	if query == "" {
-		return p
-	}
-	if i := slices.IndexFunc(p.files, func(f file) bool { return strings.HasPrefix(strings.ToLower(f.Name), query) }); i >= 0 {
-		p.cursor = i
-	} else if i := slices.IndexFunc(p.files, func(f file) bool { return fuzzyMatch(query, f.Name) }); i >= 0 {
-		p.cursor = i
-	}
-	return p
 }

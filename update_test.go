@@ -13,6 +13,7 @@ import (
 
 func init() {
 	toastDuration = 0 // send runs every command synchronously, including the toast timer
+	launch = func(path string) error { return fmt.Errorf("tests never start programs: %s", path) }
 }
 
 // newTestModel builds a model with the left (active) pane on left and the right pane on
@@ -21,8 +22,8 @@ func newTestModel(t *testing.T, left, right string) model {
 	t.Helper()
 	km := DefaultKeyMap()
 	m := model{
-		leftPane:  newPane(0, left),
-		rightPane: newPane(1, right),
+		leftPane:  newPane(0, localFS{}, left),
+		rightPane: newPane(1, localFS{}, right),
 		keyMap:    km,
 		aliasMap:  km.GetAliasMap(),
 	}
@@ -267,7 +268,7 @@ func TestFailedReloadStillOffersParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m = send(t, m, m.leftPane.loadDirectoryCmd(dir, "")())
+	m = send(t, m, m.leftPane.reloadCmd("")())
 	if len(m.leftPane.files) != 1 || !m.leftPane.files[0].IsParent || m.leftPane.cursor != 0 {
 		t.Fatalf("expected only '..' under the cursor, got %+v at %d", m.leftPane.files, m.leftPane.cursor)
 	}
@@ -505,7 +506,7 @@ func TestStalePreviewIsIgnored(t *testing.T) {
 	}
 	m = send(t, cursorTo(t, m, "b"), alt('v'))
 	// The preview of a, closed before its file was read, reports back late.
-	m = send(t, m, previewReadyMsg{path: filepath.Join(dir, "a"), content: "first"})
+	m = send(t, m, previewReadyMsg{source: localFS{}, path: filepath.Join(dir, "a"), content: "first"})
 	if p, ok := top(m).(previewModal); !ok || p.content != "second" {
 		t.Fatalf("expected the preview of b, got %+v", top(m))
 	}
