@@ -2,7 +2,7 @@
 
 Oct 4, 2026 · @Meir Kanevskiy
 
-Twin is an orthodox two-pane commander at roughly mc-1995 feature level, wrapped in a clean Bubble Tea MVU codebase. The skeleton is good enough to build on; the file-operation layer is not yet safe to trust with real data.
+Twin is an orthodox two-pane commander at roughly mc-1995 feature level, wrapped in a clean Bubble Tea MVU codebase. The skeleton is good enough to build on; the file-operation layer is not yet safe to trust with real data. *(That was before Phase 0, which fixed every Critical and High bug in the table below.)*
 
 ## Where Twin stands today
 
@@ -17,11 +17,11 @@ Twin is an orthodox two-pane commander at roughly mc-1995 feature level, wrapped
 
 **What will hurt as it grows:**
 
-- Modal state is a chain of mutually exclusive booleans in one \~600-line `Update`. Every new dialog adds a branch and a chance to forget a guard (one is already missing; see below).
-- `pane` is a plain struct with no notion of a data source, so archives, SFTP, search results or a tree view would each need special cases.
-- No config, no persistence (favorites vanish on exit), no tests, and `m.err` is set in many places but never rendered.
-- It's on Bubble Tea v1 while emitting a raw Kitty keyboard escape in `main.go`. Charm shipped v2 of Bubble Tea, Lip Gloss and Bubbles in February 2026 ([release notes](https://github.com/charmbracelet/bubbletea/releases)), and v2 handles keyboard enhancements, modifier events and OSC 52 natively.
-- DOCUMENTATION.md has drifted: it says Alt+I / Ctrl+I select files, but Alt+I is Sync Panes, Ctrl+I is indistinguishable from Tab in most terminals, and selection is actually Insert.
+- Modal state is a chain of mutually exclusive booleans in one \~600-line `Update`. Every new dialog adds a branch and a chance to forget a guard (one is already missing; see below). *(✅ fixed: modal stack)*
+- `pane` is a plain struct with no notion of a data source, so archives, SFTP, search results or a tree view would each need special cases. *(✅ fixed: pane component with a `Source`)*
+- No config, no persistence (favorites vanish on exit), no tests, and `m.err` is set in many places but never rendered. *(tests and error rendering ✅ fixed; config and persistence still open)*
+- It's on Bubble Tea v1 while emitting a raw Kitty keyboard escape in `main.go`. Charm shipped v2 of Bubble Tea, Lip Gloss and Bubbles in February 2026 ([release notes](https://github.com/charmbracelet/bubbletea/releases)), and v2 handles keyboard enhancements, modifier events and OSC 52 natively. *(✅ fixed: on v2, escape removed)*
+- DOCUMENTATION.md has drifted: it says Alt+I / Ctrl+I select files, but Alt+I is Sync Panes, Ctrl+I is indistinguishable from Tab in most terminals, and selection is actually Insert. *(✅ fixed: rewritten from `keys.go`, kept in sync by a test)*
 
 ## Fix first: bugs found reading the code
 
@@ -133,8 +133,9 @@ Goal: an architecture that can absorb fifty features without `Update` becoming 3
 - [ ] **Config** at `$XDG_CONFIG_HOME/twin/config.toml` (keymap preset, theme, columns, opener rules, custom commands); **state** at `$XDG_STATE_HOME/twin/` (favorites, history, last dirs). Hot reload.
 - [x] `bubbles/textinput` for every text field (Unicode, paste, cursor movement). *(mkdir and quick search; quick search takes typed text, Backspace and pastes only, so arrows keep moving the cursor in the pane)*
 - [ ] Golden-file UI tests with `teatest`.
+- [ ] **Release procedure**: every phase ends with a semver tag on `main` (`v0.1.0` for Phase 0, `v0.2.0` for this one; fixes in between get patch tags). Pushing a `v*` tag runs a release workflow: the CI checks, then goreleaser builds Linux amd64 and arm64 binaries with the version embedded (`twin --version`) and publishes a GitHub release with notes from the merged PRs. The steps are written down in CLAUDE.md. *(`v0.1.0` was tagged by hand on the Phase 0 merge, `2512c92`, before the workflow existed)*
 
-Exit: adding a dialog touches one new file and one registry line.
+Exit: adding a dialog touches one new file and one registry line, and pushing a tag publishes a release.
 
 ### Phase 2 — The look (v0.3)
 
@@ -156,8 +157,8 @@ Exit: looks right in Kitty, Ghostty, WezTerm, Alacritty, GNOME Terminal and a pl
 Goal: TC-grade file operations.
 
 - [ ] Job manager: queue, concurrency limit, progress (bytes, files, throughput, ETA), pause/cancel, background (job strip + a jobs panel).
-- [ ] Plan → resolve → execute pipeline: scan the whole batch, show one conflict dialog with side-by-side size/date and options TC users expect: overwrite, skip, rename, overwrite-if-older, apply-to-all.
-- [ ] Cross-device move, symlink handling options, preserve mode/mtime/ownership where permitted, optional checksum verify.
+- [ ] Plan → resolve → execute pipeline: scan the whole batch, show one conflict dialog with side-by-side size/date and options TC users expect: overwrite, skip, rename, overwrite-if-older, apply-to-all. *(partly done: Twin already plans the whole batch, asks y/n/All/skip-all per conflict and runs the batch once; the side-by-side dialog, rename and overwrite-if-older are open)*
+- [ ] Cross-device move, symlink handling options, preserve mode/mtime/ownership where permitted, optional checksum verify. *(partly done: cross-device move and mode/mtime preservation since PR 3, with symlinks always copied as links; symlink options, ownership and checksum verify are open)*
 - [ ] Trash via the freedesktop spec (F8 trashes, Shift+F8 deletes permanently); trash browser.
 - [ ] Undo stack for rename, move, trash, mkdir.
 - [ ] `fsnotify` auto-refresh of visible panes.
@@ -207,7 +208,7 @@ Exit: a week of daily use without opening mc.
 ### Phase 8 — Ecosystem and 1.0
 
 - [ ] Plugin hook: external commands with a JSON contract first; embedded Lua later only if demand is real.
-- [ ] Packaging with goreleaser: GitHub releases, AUR, Homebrew, Nix, .deb/.rpm.
+- [ ] Packaging on top of the Phase 1 release workflow: AUR, Homebrew, Nix, .deb/.rpm.
 - [ ] README demos recorded with `vhs`; docs site generated from the actions registry.
 - [ ] Performance pass: 100k-entry directory under 100 ms to first paint.
 
