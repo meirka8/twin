@@ -12,7 +12,7 @@ import (
 )
 
 // pane is one of the two file listing panels: a directory of a Source, with a cursor, a
-// selection and a quick search. Update hands it the keys no shortcut or modal takes.
+// selection and a quick search. Update hands it the keys no action or modal takes.
 type pane struct {
 	id        int
 	source    Source // Where the entries come from
@@ -143,7 +143,7 @@ func (p pane) targets() []file {
 	return files
 }
 
-// update handles messages for a pane.
+// update handles the keys and pastes no action takes: navigation and quick search.
 func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
@@ -182,20 +182,6 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 			}
 		case "esc":
 			p.search.Reset() // Clear search explicitly
-		case "insert":
-			if f, ok := p.cursorFile(); ok {
-				if !f.IsParent {
-					if _, ok := p.selected[f.Path]; ok {
-						delete(p.selected, f.Path)
-					} else {
-						p.selected[f.Path] = struct{}{}
-					}
-				}
-				// Move cursor down after selection/deselection
-				if p.cursor < len(p.files)-1 {
-					p.cursor++
-				}
-			}
 		case "backspace":
 			if p.search.Value() != "" {
 				p = p.quickSearch(msg)
@@ -209,15 +195,38 @@ func (p pane) update(msg tea.Msg) (pane, tea.Cmd) {
 		p = p.quickSearch(oneLinePaste(msg))
 	}
 
-	// Ensure viewport is within bounds
+	p.followCursor()
+	return p, nil
+}
+
+// followCursor scrolls the listing so that the cursor is in view.
+func (p *pane) followCursor() {
 	if p.cursor < p.viewportY {
 		p.viewportY = p.cursor
 	}
 	if p.cursor >= p.viewportY+p.height-2 {
 		p.viewportY = p.cursor - p.height + 3
 	}
+}
 
-	return p, nil
+// toggleSelection selects the entry under the cursor, or deselects it, and moves the cursor
+// down. ".." is never selected, but the cursor still moves past it.
+func (p *pane) toggleSelection() {
+	f, ok := p.cursorFile()
+	if !ok {
+		return
+	}
+	if !f.IsParent {
+		if _, ok := p.selected[f.Path]; ok {
+			delete(p.selected, f.Path)
+		} else {
+			p.selected[f.Path] = struct{}{}
+		}
+	}
+	if p.cursor < len(p.files)-1 {
+		p.cursor++
+	}
+	p.followCursor()
 }
 
 // quickSearch edits the quick-search query with msg (a typed character, Backspace or a

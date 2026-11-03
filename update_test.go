@@ -20,15 +20,7 @@ func init() {
 // right, both already loaded.
 func newTestModel(t *testing.T, left, right string) model {
 	t.Helper()
-	km := DefaultKeyMap()
-	m := model{
-		leftPane:  newPane(0, localFS{}, left),
-		rightPane: newPane(1, localFS{}, right),
-		keyMap:    km,
-		aliasMap:  km.GetAliasMap(),
-	}
-	m.leftPane.active = true
-	m = send(t, m, tea.WindowSizeMsg{Width: 84, Height: 28}) // Panes of 40×22
+	m := send(t, newModel(left, right), tea.WindowSizeMsg{Width: 84, Height: 28}) // Panes of 40×22
 	return send(t, m, m.Init()())
 }
 

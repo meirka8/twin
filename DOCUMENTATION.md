@@ -49,24 +49,24 @@ key. In a terminal with the Kitty keyboard protocol (Kitty, Ghostty and foot, fo
 Alt and Ctrl shortcuts also work while the keyboard is in another layout, such as Hebrew or
 Russian; in other terminals they need a Latin layout.
 
-<!-- shortcuts: kept in sync with keys.go by docs_test.go -->
+<!-- shortcuts: generated from actions.go by `go test -run TestDocumentationShortcutTable -update` -->
 | Key | F-key | Action |
 | --- | --- | --- |
+| `Alt+Q` `Ctrl+C` | `F10` | Quit, without asking |
+| `Tab` | | Switch the active pane |
 | `Alt+V` | `F3` | View the file under the cursor |
 | `Alt+C` | `F5` | Copy to the other pane |
 | `Alt+M` | `F6` | Move to the other pane |
 | `Alt+N` | `F7` | Create a folder in the active pane |
 | `Alt+D` | `F8` | Delete (permanently) |
 | `Alt+P` | `F9` | Copy the full path to the clipboard |
-| `Alt+Q` | `F10` | Quit, without asking |
-| `Ctrl+C` | | Quit (same as Alt+Q) |
-| `Tab` | | Switch the active pane |
 | `Insert` | | Select or deselect the entry under the cursor, then move down |
 | `Alt+F` | | Favorites and drives |
 | `Alt+A` | | Add a directory to the favorites |
 | `Alt+I` | | Sync panes: open the active pane's directory in the other pane |
 | `Alt+O` | | Open the directory under the cursor in the other pane |
 | `Alt+L` | | Error log |
+<!-- end of shortcuts -->
 
 ### Moving around
 
@@ -253,9 +253,10 @@ the list showing.
 | File | Contents |
 | --- | --- |
 | `model.go` | The `model` state and the initial state |
+| `actions.go` | The actions: every command with its title, help line, default keys and when it applies |
 | `pane.go` | A pane: its listing, cursor, selection, navigation, quick search and rendering |
 | `source.go` | Where a pane's entries come from, and the local filesystem |
-| `update.go` | `Update`: results of commands and the shortcuts |
+| `update.go` | `Update`: results of commands, then keys to the modal on top, the actions or the pane |
 | `modal.go` | The modal stack |
 | `modal_confirm.go`, `modal_input.go` | Yes/no question and text prompt in the status bar |
 | `modal_conflict.go` | Overwrite questions for a copy or move |
@@ -263,7 +264,6 @@ the list showing.
 | `commands.go` | Commands that do I/O and return a message |
 | `msg.go` | The message types |
 | `fs.go` | Local filesystem helpers: reading a directory, the copy/move plan, copy, move, drives |
-| `keys.go` | The key map: every shortcut, its Alt binding and F-key alias |
 | `view.go`, `styles.go` | Rendering and its styles |
 | `utils.go` | Fuzzy matching, text wrapping and small helpers |
 
@@ -271,6 +271,7 @@ Copy and move are planned, resolved and only then executed. `planBatch` sorts a 
 entries, conflicts and refused entries without touching anything; a conflict modal asks about
 each conflict; `transferFiles` runs the batch and re-checks the same safety rules.
 
-The shortcut table above mirrors `keys.go`; `docs_test.go` fails when they disagree, so a new or
-changed shortcut needs a matching row. For development commands and CI see the
+The shortcut table above and the hint bar are generated from the actions in `actions.go`.
+`docs_test.go` fails when the table is out of date, and
+`go test -run TestDocumentationShortcutTable -update` rewrites it. For development commands and CI see the
 [README](README.md).

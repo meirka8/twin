@@ -31,7 +31,8 @@ findings rather than adding exclusions. It also sets `TWIN_XDEV_DIR` to a tmpfs 
 `fs_test.go` covers the filesystem helpers with `t.TempDir()`. `update_test.go` drives
 `Update` with key messages and runs the returned commands (see its `send` helper), which is
 how to test anything that goes through the modal flow. `docs_test.go` checks that the
-shortcut table in DOCUMENTATION.md matches `keys.go`.
+shortcut table in DOCUMENTATION.md is the one generated from `actions.go`;
+`go test -run TestDocumentationShortcutTable -update` rewrites it.
 
 ## Architecture
 
@@ -46,8 +47,8 @@ responsibility rather than by feature:
   listing, cursor, viewport, selection and quick-search `textinput`. `loadDirectoryCmd` /
   `reloadCmd` list a directory through `listDir`, which sorts it (directories first) and puts
   `..` from `Source.Parent` in front; `applyListing` installs the result. `targets()` /
-  `selectedFiles()` pick what an operation acts on; `update()` handles navigation and quick
-  search; `view()` renders the pane.
+  `selectedFiles()` pick what an operation acts on; `toggleSelection()` is Insert;
+  `update()` handles navigation and quick search; `view()` renders the pane.
 - `source.go` — the `Source` interface (`List`, `Parent`, `Open`) and `localFS`, the only
   implementation so far. A pane reads only through its source, so archives, SFTP or search
   results can plug in later. Everything that changes files or hands them to another program
@@ -59,7 +60,7 @@ responsibility rather than by feature:
 - `update.go` — `Update()`, the core control flow. It first switches on async result messages
   (`directoryLoadedMsg`, `fileOperationMsg`, `transferPlannedMsg`, etc.), which apply whatever
   modal is open. Every other message (keys, pastes) goes to the modal on top of the stack if
-  there is one, otherwise to `shortcut()` (the `KeyMap` actions) and then to the active
+  there is one, otherwise to the action bound to the key (`runKey`) and then to the active
   pane's `update()`.
 - `modal.go` — the `modal` interface and the stack (`openModal`, `setModal`,
   `updateTopModal`). Modals are values: `update(m *model, msg)` returns the modal's new state,
@@ -85,13 +86,20 @@ responsibility rather than by feature:
   `transferFiles`, recursive `copyFile`/`copyDir`, `getMountedDrives`
   (parses `/proc/mounts`, filters to `/media`, `/mnt`, `/run/media`), `getStandardPaths` (home
   + XDG-style user dirs for the favorites list).
-- `keys.go` — `KeyMap`/`Shortcut`: every action has a canonical `alt+<letter>` binding plus an
-  optional F-key alias. `GetAliasMap()` maps F-key aliases back to their canonical key string;
-  `shortcut()` resolves incoming key events through this map before switching on `m.keyMap.X.Key`,
-  so a new shortcut must be added to `KeyMap` (and `GetShortcuts()`) rather than matched as a
-  raw string, and to the shortcut table in DOCUMENTATION.md.
+- `actions.go` — the actions registry. Every command is an `action`: a `name` (for config
+  keymaps), a hint-bar `title`, a `help` line for the documentation, default `keys` (the
+  first is the one the hint bar shows; F-key aliases are just more keys), an `enabled`
+  condition and a `run` function. `defaultActions()` lists them in hint-bar order; the model
+  holds them in `m.actions` with `m.keymap` (key → action), both set by `setActions`.
+  `runKey` runs a key's action through `action.do`, which skips a disabled one, so call `do`
+  rather than `run`; the key of a disabled action does nothing and never reaches the pane. The hint bar and the shortcut table in DOCUMENTATION.md are
+  generated from the actions. A new command is one line in `defaultActions()` with a run
+  method (or `opens(someModal{})` for a dialog), never a key string matched in `Update`;
+  then regenerate the documentation (see Commands). `m.keyRuns(key, name)` lets a modal close
+  on the key that opened it, and `m.keyOf(name)` names an action's key in a message.
 - `view.go` — `View()` (a `tea.View`: alt screen and keyboard enhancements are declared there)
-  and the layout: the two panes (each from `pane.view()`), status bar and hints bar. A modal's pane view is
+  and the layout: the two panes (each from `pane.view()`), status bar and hint bar (the
+  actions on Alt). A modal's pane view is
   cut to the pane's box, so it never shifts the other pane. Lip Gloss v2 counts borders and
   padding in `Width`/`Height`: `pane.width`/`height` are the content size inside the border,
   `pane.boxSize()` the size on screen.
@@ -127,7 +135,8 @@ responsibility rather than by feature:
   implementing `modal` in its own `modal_*.go` file, opened with `m.openModal`. Results that
   arrive for a modal later (like `previewReadyMsg`) are matched to it in `Update`'s result
   switch, so a stale one is ignored.
-- Keys are `tea.KeyPressMsg`. Match `msg.String()` against `KeyMap` keys; a key that types
+- Keys are `tea.KeyPressMsg`. Commands are actions; a modal or the pane matches
+  `msg.String()` against Bubble Tea's key names (`"enter"`, `"alt+c"`); a key that types
   something has `msg.Text` set (any script; `String()` then returns the text, and `"space"`
   for a space). Text fields are `bubbles/textinput`; pastes arrive as `tea.PasteMsg`.
 

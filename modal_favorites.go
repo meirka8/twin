@@ -23,8 +23,11 @@ func (f favoritesModal) update(m *model, msg tea.Msg) (modal, tea.Cmd) {
 	}
 	entries := slices.Concat(m.favorites, m.drives)
 	f.cursor = clampIndex(f.cursor, len(entries)) // An unmount or a removal shortens the list
+	if m.keyRuns(key, "favorites") {              // The key that opened it closes it
+		return nil, nil
+	}
 	switch key.String() {
-	case "esc", "q", m.keyMap.Favorites.Key:
+	case "esc", "q":
 		return nil, nil
 	case "up", "k":
 		f.cursor--

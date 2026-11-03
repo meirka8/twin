@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -77,46 +78,18 @@ func (m model) statusBarView() string {
 	return search + statusBar.Render(ansi.Truncate(status, width, "…"))
 }
 
+// hintsView is the hint bar: the actions run with Alt, each with its letter.
 func (m model) hintsView() string {
-	// Modifiers
-	// We primarily care about Alt as per user request
-	altStyle := altChipInactiveStyle
-	if m.modifierState.Alt {
-		altStyle = altChipStyle
-	}
-
-	// Check other modifiers just in case we need to show them or they affect hints
-	// But user asked to "leave only alt".
-	// We will just show "Alt" chip, highlighted if pressed.
-
-	modifiers := altStyle.Render("Alt")
-
-	// Hints
 	var hints []string
-	targetModifier := "alt" // Default fallback
-	if m.modifierState.Ctrl {
-		targetModifier = "ctrl"
-	} else if m.modifierState.Alt {
-		targetModifier = "alt"
-	} else if m.modifierState.Shift {
-		targetModifier = "shift"
-	}
-
-	for _, shortcut := range m.keyMap.GetShortcuts() {
-		if shortcut.Modifier == targetModifier {
-			hint := hintCardStyle.Render(
-				lipgloss.JoinHorizontal(lipgloss.Left,
-					hintKeyStyle.Render(shortcut.DisplayKey),
-					hintDescStyle.Render(shortcut.Action),
-				),
-			)
-			hints = append(hints, hint)
+	for _, a := range m.actions {
+		if len(a.keys) == 0 {
+			continue
+		}
+		if letter, ok := strings.CutPrefix(a.keys[0], "alt+"); ok {
+			hints = append(hints, hintCardStyle.Render(
+				lipgloss.JoinHorizontal(lipgloss.Left, hintKeyStyle.Render(letter), hintDescStyle.Render(a.title)),
+			))
 		}
 	}
-
-	return lipgloss.JoinHorizontal(lipgloss.Center, // Alignment check
-		modifiers,
-		// No spacer needed if margins are handled by styles
-		lipgloss.JoinHorizontal(lipgloss.Left, hints...),
-	)
+	return lipgloss.JoinHorizontal(lipgloss.Center, altChipStyle.Render("Alt"), lipgloss.JoinHorizontal(lipgloss.Left, hints...))
 }

@@ -18,8 +18,11 @@ func (l logModal) update(m *model, msg tea.Msg) (modal, tea.Cmd) {
 	if !ok {
 		return l, nil
 	}
+	if m.keyRuns(key, "error_log") { // The key that opened it closes it
+		return nil, nil
+	}
 	switch key.String() {
-	case "esc", "q", m.keyMap.ErrorLog.Key:
+	case "esc", "q":
 		return nil, nil
 	case "up", "k":
 		l.scrollY++

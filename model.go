@@ -39,44 +39,40 @@ type logEntry struct {
 
 // model is the main application model.
 type model struct {
-	leftPane      pane
-	rightPane     pane
-	modals        []modal // Open dialogs, the one on top last; see modal.go
-	quitting      bool
-	toast         string     // Latest error, shown in the status bar until it expires
-	toastID       int        // Identifies the toast a toastExpiredMsg is meant for
-	errLog        []logEntry // Every error reported, oldest first
-	keyMap        KeyMap
-	modifierState ModifierState
-	aliasMap      map[string]string
-	favorites     []string
-	drives        []string
+	leftPane  pane
+	rightPane pane
+	modals    []modal // Open dialogs, the one on top last; see modal.go
+	quitting  bool
+	toast     string            // Latest error, shown in the status bar until it expires
+	toastID   int               // Identifies the toast a toastExpiredMsg is meant for
+	errLog    []logEntry        // Every error reported, oldest first
+	actions   []action          // Every action with its keys, in hint-bar order; see actions.go
+	keymap    map[string]action // The action each key runs; set with actions by setActions
+	favorites []string
+	drives    []string
 }
 
-// ModifierState tracks the state of modifier keys.
-type ModifierState struct {
-	Ctrl  bool
-	Alt   bool
-	Shift bool
-}
-
-// initialModel creates a new model with default state.
+// initialModel creates the model Twin starts with: both panes on the working directory.
 func initialModel() model {
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
+	m := newModel(cwd, cwd)
+	m.favorites = getStandardPaths()
+	m.drives = getMountedDrives()
+	return m
+}
 
-	km := DefaultKeyMap()
+// newModel returns a model with the left pane, active, on left and the right one on right,
+// with the default keys and no favorites. Init loads the panes.
+func newModel(left, right string) model {
 	m := model{
-		leftPane:  newPane(0, localFS{}, cwd),
-		rightPane: newPane(1, localFS{}, cwd),
-		keyMap:    km,
-		aliasMap:  km.GetAliasMap(),
-		favorites: getStandardPaths(),
-		drives:    getMountedDrives(),
+		leftPane:  newPane(0, localFS{}, left),
+		rightPane: newPane(1, localFS{}, right),
 	}
 	m.leftPane.active = true
+	m.setActions(defaultActions())
 	return m
 }
 
