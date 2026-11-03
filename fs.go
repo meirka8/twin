@@ -16,30 +16,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Helper to get file structs from selected paths
-func getFilesFromSelected(p pane) []file {
-	var files []file
-	for _, f := range p.files {
-		if f.IsParent {
-			continue
-		}
-		if _, ok := p.selected[f.Path]; ok {
-			files = append(files, f)
-		}
-	}
-	return files
-}
-
-// operationTargets returns the selected files of p, or the file under the cursor when
-// nothing is selected. The ".." entry is never a target.
-func operationTargets(p pane) []file {
-	files := getFilesFromSelected(p)
-	if len(files) == 0 && p.cursor < len(p.files) && !p.files[p.cursor].IsParent {
-		files = []file{p.files[p.cursor]}
-	}
-	return files
-}
-
 // batchPlan is the result of checking a copy/move batch against its destination.
 type batchPlan struct {
 	clean     []file         // Destination is free
@@ -358,12 +334,11 @@ func copySymlink(src, dst string) error {
 	return os.Symlink(target, dst)
 }
 
-// readDirectory reads the contents of a directory and returns a sorted list of file structs.
-// On error it still returns the ".." entry, so a pane is never stranded without a way up.
+// readDirectory lists the entries of a local directory, in no particular order (see listDir).
 func readDirectory(dirPath string) ([]file, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return withParentEntry(nil, dirPath), err
+		return nil, err
 	}
 
 	var files []file
@@ -395,32 +370,7 @@ func readDirectory(dirPath string) ([]file, error) {
 		})
 	}
 
-	// Sort files: directories first, then alphabetically
-	sort.Slice(files, func(i, j int) bool {
-		if files[i].IsDir != files[j].IsDir {
-			return files[i].IsDir // Directories come before files
-		}
-		return files[i].Name < files[j].Name
-	})
-
-	return withParentEntry(files, dirPath), nil
-}
-
-// withParentEntry prepends the synthetic ".." entry to the listing of dirPath, unless
-// dirPath is the root.
-func withParentEntry(files []file, dirPath string) []file {
-	if filepath.Dir(dirPath) == dirPath {
-		return files
-	}
-	parent := file{
-		Name:     "..",
-		Path:     filepath.Dir(dirPath),
-		IsDir:    true,
-		IsParent: true,
-		Mode:     os.ModeDir,
-		ModTime:  time.Now(), // Dummy time
-	}
-	return append([]file{parent}, files...)
+	return files, nil
 }
 
 // getMountedDrives returns a list of mounted drive paths on Linux systems.

@@ -3,7 +3,8 @@ package main
 // Messages
 type directoryLoadedMsg struct {
 	paneID    int
-	path      string // Directory that was loaded; the pane moves there only on success
+	source    Source
+	path      string // Directory of source that was loaded; the pane moves there only on success
 	files     []file
 	err       error
 	focusPath string
@@ -28,11 +29,13 @@ type fileOperationMsg struct { // For copy/move
 
 type transferPlannedMsg struct {
 	plan     batchPlan
+	src, dst Source // Where the files come from, and where they go
 	destPath string
 	move     bool
 }
 
 type previewReadyMsg struct {
+	source  Source
 	path    string // File read, so that a preview closed in the meantime ignores it
 	content string
 	err     error

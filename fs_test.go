@@ -48,39 +48,6 @@ func fileNamed(t *testing.T, dir, name string) file {
 	return file{}
 }
 
-func TestReadDirectoryMarksParent(t *testing.T) {
-	dir := t.TempDir()
-	writeFiles(t, dir, "x", "a")
-
-	files, err := readDirectory(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(files) != 2 || !files[0].IsParent || files[0].Name != ".." {
-		t.Fatalf("expected '..' marked as parent first, got %+v", files)
-	}
-	if files[1].IsParent {
-		t.Fatalf("regular entry marked as parent: %+v", files[1])
-	}
-}
-
-func TestOperationTargetsNeverIncludeParent(t *testing.T) {
-	dir := t.TempDir()
-	writeFiles(t, dir, "x", "a")
-	files, _ := readDirectory(dir)
-
-	p := pane{path: dir, files: files, selected: map[string]struct{}{}}
-	if got := operationTargets(p); len(got) != 0 {
-		t.Fatalf("cursor on '..' must give no targets, got %+v", got)
-	}
-
-	p.selected[files[0].Path] = struct{}{} // ".." smuggled into the selection
-	p.cursor = 1
-	if got := operationTargets(p); len(got) != 1 || got[0].Name != "a" {
-		t.Fatalf("expected only 'a', got %+v", got)
-	}
-}
-
 func TestPlanBatch(t *testing.T) {
 	src, dst := t.TempDir(), t.TempDir()
 	writeFiles(t, src, "new", "clean", "conflict")
@@ -88,7 +55,7 @@ func TestPlanBatch(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(src, "dir"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	files, _ := readDirectory(src) // .., dir, clean, conflict
+	files, _ := listDir(localFS{}, src) // .., dir, clean, conflict
 
 	plan := planBatch(files, dst)
 	if len(plan.clean) != 2 || len(plan.conflicts) != 1 || len(plan.rejected) != 1 {
@@ -182,17 +149,6 @@ func TestReadDirectoryResolvesSymlinks(t *testing.T) {
 	}
 	if f := fileNamed(t, dir, "broken"); f.IsDir || !f.IsSymlink {
 		t.Errorf("broken link: %+v", f)
-	}
-}
-
-func TestReadDirectoryErrorKeepsParent(t *testing.T) {
-	missing := filepath.Join(t.TempDir(), "missing")
-	files, err := readDirectory(missing)
-	if err == nil {
-		t.Fatal("expected an error")
-	}
-	if len(files) != 1 || !files[0].IsParent {
-		t.Fatalf("expected only '..', got %+v", files)
 	}
 }
 

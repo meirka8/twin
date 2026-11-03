@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -30,33 +29,6 @@ type file struct {
 type fileConflict struct {
 	Source      file
 	Destination string
-}
-
-// pane represents one of the two file listing panels.
-type pane struct {
-	id        int
-	path      string
-	files     []file
-	selected  map[string]struct{} // Paths of selected files
-	cursor    int
-	active    bool
-	viewportY int             // Top of the visible area in the file list
-	height    int             // Height of the pane's content, inside its border
-	width     int             // Width of the pane's content, inside its border
-	search    textinput.Model // Quick-search query
-}
-
-// newPane returns an empty pane; loadDirectoryCmd fills it.
-func newPane(id int, path string) pane {
-	search := textinput.New()
-	search.Focus() // It only gets the keys pane.update passes on to it
-	return pane{id: id, path: path, selected: make(map[string]struct{}), search: search}
-}
-
-// boxSize is the size of the pane on screen, border included. Modals shown in place of
-// the pane fill the same box.
-func (p pane) boxSize() (width, height int) {
-	return p.width + 2, p.height + 2
 }
 
 // logEntry is one line of the error log.
@@ -97,8 +69,8 @@ func initialModel() model {
 
 	km := DefaultKeyMap()
 	m := model{
-		leftPane:  newPane(0, cwd),
-		rightPane: newPane(1, cwd),
+		leftPane:  newPane(0, localFS{}, cwd),
+		rightPane: newPane(1, localFS{}, cwd),
 		keyMap:    km,
 		aliasMap:  km.GetAliasMap(),
 		favorites: getStandardPaths(),
@@ -125,5 +97,5 @@ func (m *model) inactivePane() *pane {
 
 // Init initializes the application.
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.leftPane.loadDirectoryCmd(m.leftPane.path, ""), m.rightPane.loadDirectoryCmd(m.rightPane.path, ""))
+	return tea.Batch(m.leftPane.reloadCmd(""), m.rightPane.reloadCmd(""))
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,34 +15,45 @@ import (
 	"github.com/atotto/clipboard"
 )
 
-// Commands
-// loadDirectoryCmd lists path for the pane: its own path to reload, another one to navigate.
-func (p pane) loadDirectoryCmd(path, focusPath string) tea.Cmd {
-	return func() tea.Msg {
-		files, err := readDirectory(path)
-		return directoryLoadedMsg{paneID: p.id, path: path, files: files, err: err, focusPath: focusPath}
-	}
-}
+// Commands that do I/O off the UI thread and report back with a message. The pane's own
+// listing command, loadDirectoryCmd, is in pane.go.
 
-func openFileCmd(path string) tea.Cmd {
+// The commands below that change files or hand them to another program check their
+// sources with localOnly themselves, although the shortcuts refuse earlier for the user's
+// sake: a path of another source must never reach the disk.
+
+// launch opens path with its default application. Tests replace it, so that they never start
+// one.
+var launch = func(path string) error { return exec.Command("xdg-open", path).Run() }
+
+// openFileCmd opens the file at path of src with its default application.
+func openFileCmd(src Source, path string) tea.Cmd {
 	return func() tea.Msg {
-		cmd := exec.Command("xdg-open", path)
-		if err := cmd.Run(); err != nil {
+		if err := localOnly("Open", src); err != nil {
+			return fileOpenedMsg{err: err}
+		}
+		if err := launch(path); err != nil {
 			return fileOpenedMsg{err: fmt.Errorf("open %s: %w", filepath.Base(path), err)}
 		}
 		return fileOpenedMsg{}
 	}
 }
 
-func createFolderCmd(path string) tea.Cmd {
+func createFolderCmd(src Source, path string) tea.Cmd {
 	return func() tea.Msg {
+		if err := localOnly("MkDir", src); err != nil {
+			return folderCreatedMsg{err: err}
+		}
 		err := os.Mkdir(path, 0755)
 		return folderCreatedMsg{err: err, folderPath: path}
 	}
 }
 
-func deleteFilesCmd(files []file) tea.Cmd {
+func deleteFilesCmd(src Source, files []file) tea.Cmd {
 	return func() tea.Msg {
+		if err := localOnly("Delete", src); err != nil {
+			return fileDeletedMsg{err: err}
+		}
 		var errors []string
 		for _, f := range files {
 			if f.IsParent {
@@ -64,40 +76,81 @@ func deleteFilesCmd(files []file) tea.Cmd {
 	}
 }
 
-// planTransferCmd checks a copy/move batch against the destination without touching any
-// file; Update then resolves conflicts and runs transferFilesCmd for the whole batch.
-func planTransferCmd(sourceFiles []file, destPath string, move bool) tea.Cmd {
+// transferAction names a copy or a move for messages.
+func transferAction(move bool) string {
+	if move {
+		return "Move"
+	}
+	return "Copy"
+}
+
+// planTransferCmd checks a copy/move batch from src against destDir of dst without touching
+// any file; Update then resolves conflicts and runs transferFilesCmd for the whole batch.
+func planTransferCmd(src Source, files []file, dst Source, destDir string, move bool) tea.Cmd {
 	return func() tea.Msg {
-		return transferPlannedMsg{plan: planBatch(sourceFiles, destPath), destPath: destPath, move: move}
+		msg := transferPlannedMsg{src: src, dst: dst, destPath: destDir, move: move}
+		if err := localOnly(transferAction(move), src, dst); err != nil {
+			msg.plan.rejected = []string{err.Error()}
+			return msg
+		}
+		msg.plan = planBatch(files, destDir)
+		return msg
 	}
 }
 
-func transferFilesCmd(files []file, destPath string, move bool) tea.Cmd {
+func transferFilesCmd(src Source, files []file, dst Source, destDir string, move bool) tea.Cmd {
 	return func() tea.Msg {
-		return fileOperationMsg{err: transferFiles(files, destPath, move)}
+		if err := localOnly(transferAction(move), src, dst); err != nil {
+			return fileOperationMsg{err: err}
+		}
+		return fileOperationMsg{err: transferFiles(files, destDir, move)}
 	}
 }
 
-func previewFileCmd(path string) tea.Cmd {
+// previewLimit is how much of a file the preview reads and shows.
+const previewLimit = 100 * 1024
+
+// previewFileCmd reads the start of the file at path of src for the preview.
+func previewFileCmd(src Source, path string) tea.Cmd {
 	return func() tea.Msg {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return previewReadyMsg{path: path, err: fmt.Errorf("could not read file: %w", err)}
+		msg := previewReadyMsg{source: src, path: path}
+		content, more, err := readHead(src, path, previewLimit)
+		switch {
+		case err != nil:
+			msg.err = fmt.Errorf("could not read file: %w", err)
+		case !utf8.Valid(content) || bytes.IndexByte(content, 0) >= 0: // Binary, as far as read
+			msg.content = fmt.Sprintf("--- Binary file: %s ---", filepath.Base(path))
+		case more:
+			msg.content = fmt.Sprintf("--- File too large for preview (%s), showing the first %d KB ---\n%s", filepath.Base(path), previewLimit/1024, content)
+		default:
+			msg.content = string(content)
 		}
-
-		// Basic check for binary content
-		if !utf8.Valid(content) || bytes.Contains(content, []byte{0}) {
-			return previewReadyMsg{path: path, content: fmt.Sprintf("--- Binary file: %s ---", filepath.Base(path))}
-		}
-
-		// Limit preview size
-		const maxPreviewSize = 1024 * 100 // 100KB
-		if len(content) > maxPreviewSize {
-			return previewReadyMsg{path: path, content: fmt.Sprintf("--- File too large for preview (%s), showing first %d bytes ---\n%s", filepath.Base(path), maxPreviewSize, content[:maxPreviewSize])}
-		}
-
-		return previewReadyMsg{path: path, content: string(content)}
+		return msg
 	}
+}
+
+// readHead reads at most limit bytes from the start of the file at path of src, without
+// splitting a UTF-8 character at the end; more reports whether the file goes on.
+func readHead(src Source, path string, limit int) (_ []byte, more bool, err error) {
+	f, err := src.Open(path)
+	if err != nil {
+		return nil, false, err
+	}
+	defer f.Close()
+	content, err := io.ReadAll(io.LimitReader(f, int64(limit)+1)) // One byte over tells there is more
+	if err != nil || len(content) <= limit {
+		return content, false, err
+	}
+	content = content[:limit]
+	for i := len(content) - 1; i >= max(len(content)-utf8.UTFMax, 0); i-- {
+		if utf8.RuneStart(content[i]) {
+			if !utf8.FullRune(content[i:]) {
+				content = content[:i]
+			}
+			break
+		}
+	}
+	return content, true, nil
 }
 
 func unmountDriveCmd(path string) tea.Cmd {

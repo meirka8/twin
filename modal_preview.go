@@ -8,7 +8,8 @@ import (
 
 // previewModal shows a text file in place of the active pane, wrapped to its width.
 type previewModal struct {
-	path    string // File shown; previewReadyMsg for any other file is stale
+	source  Source
+	path    string // File shown, of source; previewReadyMsg for any other file is stale
 	content string // Empty until previewFileCmd reports back
 	scrollY int    // First line shown
 }
