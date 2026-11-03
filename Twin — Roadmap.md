@@ -133,8 +133,9 @@ Goal: an architecture that can absorb fifty features without `Update` becoming 3
 - [ ] **Config** at `$XDG_CONFIG_HOME/twin/config.toml` (keymap preset, theme, columns, opener rules, custom commands); **state** at `$XDG_STATE_HOME/twin/` (favorites, history, last dirs). Hot reload.
 - [x] `bubbles/textinput` for every text field (Unicode, paste, cursor movement). *(mkdir and quick search; quick search takes typed text, Backspace and pastes only, so arrows keep moving the cursor in the pane)*
 - [ ] Golden-file UI tests with `teatest`.
+- [ ] **Release procedure**: every phase ends with a semver tag on `main` (`v0.1.0` for Phase 0, `v0.2.0` for this one; fixes in between get patch tags). Pushing a `v*` tag runs a release workflow: the CI checks, then goreleaser builds Linux amd64 and arm64 binaries with the version embedded (`twin --version`) and publishes a GitHub release with notes from the merged PRs. The steps are written down in CLAUDE.md. *(`v0.1.0` was tagged by hand on the Phase 0 merge, `2512c92`, before the workflow existed)*
 
-Exit: adding a dialog touches one new file and one registry line.
+Exit: adding a dialog touches one new file and one registry line, and pushing a tag publishes a release.
 
 ### Phase 2 — The look (v0.3)
 
@@ -207,7 +208,7 @@ Exit: a week of daily use without opening mc.
 ### Phase 8 — Ecosystem and 1.0
 
 - [ ] Plugin hook: external commands with a JSON contract first; embedded Lua later only if demand is real.
-- [ ] Packaging with goreleaser: GitHub releases, AUR, Homebrew, Nix, .deb/.rpm.
+- [ ] Packaging on top of the Phase 1 release workflow: AUR, Homebrew, Nix, .deb/.rpm.
 - [ ] README demos recorded with `vhs`; docs site generated from the actions registry.
 - [ ] Performance pass: 100k-entry directory under 100 ms to first paint.
 
