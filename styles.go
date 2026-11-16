@@ -35,19 +35,12 @@ var (
 		return s
 	}()
 
-	// Chip styles
+	// altChipStyle labels the hint bar with the modifier its keys take.
 	altChipStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("0")).
-			Background(lipgloss.Color("63")). // Blue-ish background for active state
-			Bold(true).
+			Foreground(lipgloss.Color("250")).
+			Background(lipgloss.Color("235")).
 			Padding(0, 1).
 			MarginRight(1)
-
-	altChipInactiveStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("250")).
-				Background(lipgloss.Color("235")).
-				Padding(0, 1).
-				MarginRight(1)
 
 	hintKeyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Bold(true).Background(lipgloss.Color("235")).Padding(0, 1)
 	hintDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250")).Background(lipgloss.Color("233")).Padding(0, 1)

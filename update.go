@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -33,8 +32,10 @@ func (m *model) reportError(err error) tea.Cmd {
 		m.errLog = m.errLog[len(m.errLog)-maxLogEntries:]
 	}
 	m.toast = lines[0]
-	if len(lines) > 1 {
-		m.toast += fmt.Sprintf(" (+%d more, %s for the log)", len(lines)-1, m.keyMap.ErrorLog.Key)
+	if key := m.keyOf("error_log"); len(lines) > 1 && key != "" {
+		m.toast += fmt.Sprintf(" (+%d more, %s for the log)", len(lines)-1, key)
+	} else if len(lines) > 1 {
+		m.toast += fmt.Sprintf(" (+%d more in the log)", len(lines)-1)
 	}
 	m.toastID++
 	id := m.toastID
@@ -43,7 +44,8 @@ func (m *model) reportError(err error) tea.Cmd {
 
 // Update handles messages and updates the model. Results of commands are applied first,
 // whatever dialog is open; everything else (keys, pastes) goes to the modal on top of the
-// stack if there is one, and otherwise to the shortcuts and then to the active pane.
+// stack if there is one, and otherwise to the actions (see actions.go) and then to the
+// active pane.
 //
 // Where a command comes from a method of m, it is assigned before returning because Go does
 // not order the evaluation of m against the method call in `return m, m.f()`.
@@ -143,8 +145,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// A key of an action runs it; the panes never see it, even while the action is disabled.
 	if msg, ok := msg.(tea.KeyPressMsg); ok {
-		if cmd, ok := m.shortcut(msg); ok {
+		if cmd, ok := m.runKey(msg); ok {
 			return m, cmd
 		}
 	}
@@ -165,108 +168,4 @@ func layoutKey(key tea.KeyPressMsg) tea.KeyPressMsg {
 		key.BaseCode = 0
 	}
 	return key
-}
-
-// shortcut runs the KeyMap action bound to key, if any; ok is false for any other key.
-func (m *model) shortcut(key tea.KeyPressMsg) (_ tea.Cmd, ok bool) {
-	k := key.String()
-	if mapKey, ok := m.aliasMap[k]; ok {
-		k = mapKey
-	}
-	p := m.activePane()
-	switch k {
-	case m.keyMap.Quit.Key, m.keyMap.ForceQuit.Key:
-		m.quitting = true
-		return tea.Quit, true
-	case m.keyMap.SwitchPane.Key:
-		m.leftPane.active = !m.leftPane.active
-		m.rightPane.active = !m.rightPane.active
-		return nil, true
-	case m.keyMap.Preview.Key:
-		if f, ok := p.cursorFile(); ok && !f.IsDir {
-			m.openModal(previewModal{source: p.source, path: f.Path})
-			return previewFileCmd(p.source, f.Path), true
-		}
-		return nil, true
-	case m.keyMap.Copy.Key, m.keyMap.Move.Key:
-		files := p.targets()
-		if len(files) == 0 {
-			return nil, true
-		}
-		move, dst := k == m.keyMap.Move.Key, m.inactivePane()
-		if err := localOnly(transferAction(move), p.source, dst.source); err != nil {
-			return m.reportError(err), true
-		}
-		p.selected = make(map[string]struct{}) // Clear selection
-		return planTransferCmd(p.source, files, dst.source, dst.path, move), true
-	case m.keyMap.NewFolder.Key:
-		if err := localOnly("MkDir", p.source); err != nil {
-			return m.reportError(err), true
-		}
-		src, dir := p.source, p.path
-		m.openModal(newInputModal("Create folder: ", func(_ *model, name string) tea.Cmd {
-			if name == "" {
-				return nil
-			}
-			return createFolderCmd(src, filepath.Join(dir, name))
-		}))
-		return nil, true
-	case m.keyMap.Delete.Key:
-		files := p.targets()
-		if len(files) == 0 {
-			return nil, true
-		}
-		if err := localOnly("Delete", p.source); err != nil {
-			return m.reportError(err), true
-		}
-		src := p.source
-		prompt := fmt.Sprintf("Delete %d items?", len(files))
-		if len(files) == 1 {
-			prompt = fmt.Sprintf("Delete %s?", files[0].Name)
-		}
-		m.openModal(newConfirmModal(prompt, func(m *model) tea.Cmd {
-			m.activePane().selected = make(map[string]struct{}) // Clear selection
-			return deleteFilesCmd(src, files)
-		}))
-		return nil, true
-	case m.keyMap.CopyPath.Key:
-		files := p.selectedFiles()
-		if f, ok := p.cursorFile(); ok && len(files) == 0 { // ".." included: it names a directory
-			files = []file{f}
-		}
-		if len(files) == 0 {
-			return nil, true
-		}
-		var paths []string
-		for _, f := range files {
-			paths = append(paths, f.Path)
-		}
-		return copyToClipboardCmd(strings.Join(paths, "\n")), true
-	case m.keyMap.ErrorLog.Key:
-		m.openModal(logModal{})
-		return nil, true
-	case m.keyMap.Favorites.Key:
-		m.openModal(favoritesModal{})
-		return nil, true
-	case m.keyMap.AddToFavorites.Key:
-		if err := localOnly("Add Fav", p.source); err != nil {
-			return m.reportError(err), true // Favorites are local directories
-		}
-		pathToAdd := p.path
-		if f, ok := p.cursorFile(); ok && f.IsDir && !f.IsParent {
-			pathToAdd = f.Path
-		}
-		if !slices.Contains(m.favorites, pathToAdd) {
-			m.favorites = append(m.favorites, pathToAdd)
-		}
-		return nil, true
-	case m.keyMap.SyncPanes.Key:
-		return m.inactivePane().loadDirectoryCmd(p.source, p.path, ""), true
-	case m.keyMap.OpenInOther.Key:
-		if f, ok := p.cursorFile(); ok && f.IsDir {
-			return m.inactivePane().loadDirectoryCmd(p.source, f.Path, ""), true
-		}
-		return nil, true
-	}
-	return nil, false
 }
